@@ -1,0 +1,13 @@
+{
+  "projectId": "72447251",
+  "functions": {
+    "products-csv": {
+      "hasChanged": false,
+      "hash": "f562faa503150dd3a92b366bf61068214ced68eb33d8fa241d42bd8c12349834"
+    },
+    "brands-csv": {
+      "hasChanged": false,
+      "hash": "9d4b6089709d69165301c47ef3bc1131a3629b6e2cbd97fce41829996e751e95"
+    }
+  }
+}

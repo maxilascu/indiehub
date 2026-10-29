@@ -1,0 +1,7 @@
+[functions.products-csv]
+verify_jwt = false
+entrypoint = "./functions/products-csv/index.ts"
+
+[functions.brands-csv]
+verify_jwt = false
+entrypoint = "./functions/brands-csv/index.ts"
