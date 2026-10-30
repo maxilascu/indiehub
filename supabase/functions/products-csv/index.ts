@@ -13,6 +13,8 @@ const CACHE_TTL_SECONDS = 60;
 const CACHE_TABLE = "csv_cache";
 const CACHE_KEY = "products";
 
+const FREE_SHIPPING_TEXT = /\benvio\s+gratu/;
+
 interface RawRow {
   [key: string]: string;
 }
@@ -28,6 +30,7 @@ interface Product {
   category: string;
   style: string;
   promotion: string;
+  freeShipping: boolean;
   previousPrice: number | null;
   images: string[];
   description: string;
@@ -158,10 +161,12 @@ function mapRows(rows: Record<string, string>[]): Product[] {
       const description = getField(row, "Descripcion", "Descripción");
       const link = getField(row, "URL", "Link_Tienda") || "#";
       const gender = getField(row, "Genero", "Género") || "Unisex";
-      const category = getField(row, "Prenda");
+      const category = getField(row, "TipoPrenda", "Prenda");
       const style = getField(row, "Estilo");
       const location = getField(row, "Ubicacion", "Ubicación");
-      const promotion = getField(row, "Promocion", "Promoción");
+      const rawPromotion = getField(row, "Promocion", "Promoción").trim();
+      const promotion = FREE_SHIPPING_TEXT.test(normalizeKey(rawPromotion)) ? "" : rawPromotion;
+      const freeShipping = normalizeKey(getField(row, "Envio_Gratis", "Envio Gratis")) === "si";
       const previousPriceRaw = getField(
         row,
         "Precio Anterior",
@@ -187,7 +192,8 @@ function mapRows(rows: Record<string, string>[]): Product[] {
         category,
         style,
         location,
-        promotion: promotion.trim(),
+        promotion,
+        freeShipping,
         previousPrice,
       } as Product;
     })

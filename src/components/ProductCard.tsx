@@ -1,5 +1,6 @@
 import { ArrowUpRight } from 'lucide-react';
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Product } from '@/data/products';
+import FreeShippingBadge from '@/components/FreeShippingBadge';
 import { trackOutboundClick } from '@/lib/analytics';
 
 interface Props {
@@ -33,6 +34,9 @@ export default function ProductCard({ product, onOpen }: Props) {
             }}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
+          {product.freeShipping && (
+            <FreeShippingBadge className="absolute left-2 top-2" />
+          )}
           {product.promotion && (
             <span className="absolute bottom-2 right-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-md">
               {product.promotion}

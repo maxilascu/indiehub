@@ -4,14 +4,14 @@ export interface BrandLocationFilters {
   province: string;
   city: string;
   storeOnly: boolean;
-  nationwideOnly: boolean;
+  shippingOnly: boolean;
 }
 
 export const EMPTY_BRAND_LOCATION_FILTERS: BrandLocationFilters = {
   province: '',
   city: '',
   storeOnly: false,
-  nationwideOnly: false,
+  shippingOnly: false,
 };
 
 export function getProvinceOptions(brands: Brand[]): string[] {
@@ -31,7 +31,7 @@ export function filterBrandsByLocation(
 ): Brand[] {
   return brands.filter((brand) => {
     if (filters.storeOnly && !brand.hasStore) return false;
-    if (filters.nationwideOnly && !brand.shipsNationwide) return false;
+    if (filters.shippingOnly && !brand.hasShipping) return false;
     if (!filters.province) return true;
 
     const hasLocalInPlace =

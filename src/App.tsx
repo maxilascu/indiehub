@@ -10,6 +10,7 @@ import FiltersPanel, {
   type SortOption,
 } from '@/components/FiltersPanel';
 import ProductGrid from '@/components/ProductGrid';
+import ProductDetailModal from '@/components/ProductDetailModal';
 import AboutView from '@/components/AboutView';
 import AboutFooter from '@/components/AboutFooter';
 import {
@@ -36,6 +37,7 @@ export default function App() {
   const [brandsError, setBrandsError] = useState<string | null>(null);
   const [view, setView] = useState<View>('explore');
   const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [priceLimits, setPriceLimits] = useState({ min: 0, max: 0 });
 
@@ -147,7 +149,7 @@ export default function App() {
             province: values.province,
             city: values.city,
             storeOnly: false,
-            nationwideOnly: false,
+            shippingOnly: false,
           }).map((brand) => brand.name)
         )
       : null;
@@ -263,7 +265,11 @@ export default function App() {
 
           <main className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
             <div id="promotions-banner" className="mt-2 scroll-mt-20">
-              <PromotionsBanner products={promoProducts} loading={loading} />
+              <PromotionsBanner
+                products={promoProducts}
+                loading={loading}
+                onSelectProduct={setSelectedProduct}
+              />
             </div>
 
             {selectedBrand && (
@@ -302,7 +308,12 @@ export default function App() {
             </div>
 
             <div className="mt-4">
-              <ProductGrid products={filtered} loading={loading} error={error} />
+              <ProductGrid
+                products={filtered}
+                loading={loading}
+                error={error}
+                onSelectProduct={setSelectedProduct}
+              />
             </div>
           </main>
         </>
@@ -320,6 +331,8 @@ export default function App() {
       )}
 
       {view === 'about' && <AboutView />}
+
+      <ProductDetailModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
 
       <FiltersPanel
         open={filtersOpen}

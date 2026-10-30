@@ -116,7 +116,7 @@ export default function BrandsGrid({
                     {[brand.city, brand.province].filter(Boolean).join(', ')}
                   </p>
                 )}
-                {(brand.hasStore || brand.shipsNationwide) && (
+                {(brand.hasStore || brand.hasShipping) && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {brand.hasStore && (
                       <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
@@ -124,10 +124,10 @@ export default function BrandsGrid({
                         Showroom
                       </span>
                     )}
-                    {brand.shipsNationwide && (
+                    {brand.hasShipping && (
                       <span className="flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
                         <Truck className="h-3 w-3" />
-                        Envíos a todo el país
+                        Con envío
                       </span>
                     )}
                   </div>

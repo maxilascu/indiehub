@@ -22,6 +22,7 @@ interface Brand {
   hasStore: boolean;
   address: string;
   shipsNationwide: boolean;
+  hasShipping: boolean;
   description: string;
 }
 
@@ -106,6 +107,7 @@ function mapRows(rows: Record<string, string>[]): Brand[] {
       hasStore: normalizeKey(getField(row, "Tiene_Local", "Tiene Local")) === "si",
       address: getField(row, "Direccion", "Dirección"),
       shipsNationwide: scope.includes("nacional") || scope.includes("todo el pais"),
+      hasShipping: normalizeKey(getField(row, "Tiene_Envio", "Tiene Envio")) === "si",
       description: getField(row, "Descripcion", "Descripción"),
     };
   }).filter((brand) => brand.name);

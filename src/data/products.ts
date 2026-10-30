@@ -8,6 +8,7 @@ export interface Brand {
   hasStore: boolean;
   address: string;
   shipsNationwide: boolean;
+  hasShipping: boolean;
   description: string;
 }
 
@@ -23,6 +24,7 @@ export interface Product {
   style: string;
   location: string;
   promotion: string;
+  freeShipping: boolean;
   previousPrice: number | null;
   images: string[];
   description: string;
