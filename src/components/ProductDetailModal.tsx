@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, ChevronDown, Home, MapPin, Ruler, Store, Truck, X } from 'lucide-react';
+import { ArrowUpRight, Home, MapPin, Store, Truck, X } from 'lucide-react';
 import FreeShippingBadge from '@/components/FreeShippingBadge';
+import SizeGuide from '@/components/SizeGuide';
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Brand, type Product } from '@/data/products';
 import { trackOutboundClick } from '@/lib/analytics';
 
@@ -13,12 +14,10 @@ interface Props {
 
 export default function ProductDetailModal({ product, brands, onClose, onViewBrand }: Props) {
   const [imageIndex, setImageIndex] = useState(0);
-  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
 
   useEffect(() => {
     if (!product) return;
     setImageIndex(0);
-    setSizeGuideOpen(false);
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
@@ -145,33 +144,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
                   </span>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => setSizeGuideOpen((open) => !open)}
-                aria-expanded={sizeGuideOpen}
-                className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500 transition hover:text-neutral-800"
-              >
-                <Ruler className="h-3 w-3" />
-                Guía y tabla de talles
-                <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${sizeGuideOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {sizeGuideOpen && (
-                <p className="mt-2 rounded-lg bg-neutral-50 px-3 py-2 text-[11px] leading-5 text-neutral-500 ring-1 ring-neutral-100">
-  <pre className="text-xs font-mono whitespace-pre-wrap text-neutral-600 bg-neutral-50 p-3 rounded">
-  {`📏 TABLA ESTIMATIVA DE MEDIDAS (cm)
-
-Talle   Pecho      Cintura    Cadera
-S       88 - 94    74 - 80    90 - 96
-M       95 - 101   81 - 87    97 - 103
-L      102 - 108   88 - 94   104 - 110
-XL     109 - 115   95 - 101  111 - 117
-
-* Medidas corporales orientativas. El calce final puede variar según la moldería de la marca (oversize, regular o al cuerpo).`}
-</pre>
-                  
-                  
-                </p>
-              )}
+              <SizeGuide key={product.id} />
             </div>
           )}
 
