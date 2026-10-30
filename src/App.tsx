@@ -48,6 +48,8 @@ export default function App() {
     styles: [],
     province: '',
     city: '',
+    storeOnly: false,
+    shippingOnly: false,
     minPrice: 0,
     maxPrice: 0,
     sort: DEFAULT_SORT,
@@ -143,13 +145,13 @@ export default function App() {
 
   const filterProducts = (values: FilterValues): Product[] => {
     const search = query.trim().toLowerCase();
-    const locationBrands = values.province
+    const locationBrands = values.province || values.storeOnly || values.shippingOnly
       ? new Set(
           filterBrandsByLocation(brands, {
             province: values.province,
             city: values.city,
-            storeOnly: false,
-            shippingOnly: false,
+            storeOnly: values.storeOnly,
+            shippingOnly: values.shippingOnly,
           }).map((brand) => brand.name)
         )
       : null;
@@ -240,6 +242,8 @@ export default function App() {
       styles: [],
       province: '',
       city: '',
+      storeOnly: false,
+      shippingOnly: false,
       minPrice: priceLimits.min,
       maxPrice: priceLimits.max,
       sort: DEFAULT_SORT,

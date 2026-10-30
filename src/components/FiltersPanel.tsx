@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Check, SlidersHorizontal, X } from 'lucide-react';
+import { Check, Home, SlidersHorizontal, Truck, X } from 'lucide-react';
 import LocationSelects from '@/components/LocationSelects';
 
 export type SortOption = 'recent' | 'price-asc' | 'price-desc' | 'promotions';
@@ -10,6 +10,8 @@ export interface FilterValues {
   styles: string[];
   province: string;
   city: string;
+  storeOnly: boolean;
+  shippingOnly: boolean;
   minPrice: number;
   maxPrice: number;
   sort: SortOption;
@@ -21,6 +23,8 @@ export function countActiveFilters(values: FilterValues, priceMin: number, price
     Number(values.gender !== 'Todos') +
     Number(values.styles.length > 0) +
     Number(Boolean(values.province)) +
+    Number(values.storeOnly) +
+    Number(values.shippingOnly) +
     Number(values.minPrice !== priceMin || values.maxPrice !== priceMax)
   );
 }
@@ -195,6 +199,23 @@ export default function FiltersPanel({
             </p>
           </FilterSection>
 
+          <FilterSection title="Modalidad de entrega">
+            <div className="flex flex-wrap gap-2">
+              <DeliveryChip
+                active={values.storeOnly}
+                onClick={() => onChange({ ...values, storeOnly: !values.storeOnly })}
+                icon={<Home className="h-3.5 w-3.5" />}
+                label="Tienda Física / Showroom"
+              />
+              <DeliveryChip
+                active={values.shippingOnly}
+                onClick={() => onChange({ ...values, shippingOnly: !values.shippingOnly })}
+                icon={<Truck className="h-3.5 w-3.5" />}
+                label="Con Envío"
+              />
+            </div>
+          </FilterSection>
+
           <FilterSection title="Rango de precio">
             <div className="grid grid-cols-2 gap-3">
               <PriceInput
@@ -278,6 +299,33 @@ function PriceInput({
         className="mt-0.5 w-full bg-transparent text-sm font-semibold text-neutral-800 outline-none"
       />
     </label>
+  );
+}
+
+function DeliveryChip({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition active:scale-95 ${
+        active
+          ? 'bg-emerald-600 text-white shadow-sm'
+          : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
