@@ -1,7 +1,5 @@
-import { ArrowUpRight } from 'lucide-react';
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Product } from '@/data/products';
 import FreeShippingBadge from '@/components/FreeShippingBadge';
-import { trackOutboundClick } from '@/lib/analytics';
 
 interface Props {
   product: Product;
@@ -63,19 +61,6 @@ export default function ProductCard({ product, onOpen }: Props) {
           </span>
         </span>
       </button>
-
-      <div className="px-1.5 pb-1.5 pt-1">
-        <a
-          href={product.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => trackOutboundClick(product.brand, product.link, 'ecommerce')}
-          className="flex items-center justify-center gap-0.5 rounded-md bg-neutral-900 py-1 text-[9px] font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.98]"
-        >
-          Ver tienda
-          <ArrowUpRight className="h-2.5 w-2.5" />
-        </a>
-      </div>
     </article>
   );
 }

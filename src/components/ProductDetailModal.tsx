@@ -32,6 +32,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
   );
   const image = product.images[imageIndex] ?? product.image;
   const brand = brands.find((b) => b.name === product.brand);
+  const storeUrl = brand?.instagram || product.link;
   const chips = [product.category, product.gender, product.style].filter(Boolean);
   const locationParts = [brand?.city, brand?.province].filter(Boolean);
   const deliveryInfo: string[] = [];
@@ -190,10 +191,10 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
 
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
             <a
-              href={product.link}
+              href={storeUrl}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => trackOutboundClick(product.brand, product.link, 'ecommerce')}
+              onClick={() => trackOutboundClick(product.brand, storeUrl, 'ecommerce')}
               className="flex flex-[1.6] items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 active:scale-[0.98]"
             >
               Ver en la tienda

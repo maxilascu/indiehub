@@ -156,7 +156,7 @@ export default function BrandsGrid({
                       className="flex items-center justify-center gap-1.5 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-200 hover:text-neutral-900"
                     >
                       <ArrowUpRight className="h-3.5 w-3.5" />
-                      Instagram
+                      Ver tienda
                     </a>
                   )}
                 </div>
