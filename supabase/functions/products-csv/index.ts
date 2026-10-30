@@ -34,6 +34,7 @@ interface Product {
   previousPrice: number | null;
   images: string[];
   description: string;
+  sizes: string[];
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -139,6 +140,13 @@ function getField(
   return "";
 }
 
+function parseSizes(raw: string): string[] {
+  return raw
+    .split(/[,;/|]/)
+    .map((size) => size.trim())
+    .filter((size) => size !== "");
+}
+
 function mapRows(rows: Record<string, string>[]): Product[] {
   const FALLBACK_IMAGE =
     "https://images.pexels.com/photos/8146450/pexels-photo-8146450.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
@@ -159,6 +167,7 @@ function mapRows(rows: Record<string, string>[]): Product[] {
         getField(row, "Imagen_4", "Imagen 4"),
       ].filter((url) => url !== "");
       const description = getField(row, "Descripcion", "Descripción");
+      const sizes = parseSizes(getField(row, "Talles"));
       const link = getField(row, "URL", "Link_Tienda") || "#";
       const gender = getField(row, "Genero", "Género") || "Unisex";
       const category = getField(row, "TipoPrenda", "Prenda");
@@ -195,6 +204,7 @@ function mapRows(rows: Record<string, string>[]): Product[] {
         promotion,
         freeShipping,
         previousPrice,
+        sizes,
       } as Product;
     })
     .filter((p): p is Product => p !== null);

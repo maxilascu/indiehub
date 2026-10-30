@@ -128,6 +128,24 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
             </div>
           )}
 
+          {product.sizes.length > 0 && (
+            <div className="mt-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-400">
+                Talles disponibles
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {product.sizes.map((size) => (
+                  <span
+                    key={size}
+                    className="grid min-w-10 place-items-center rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-neutral-800"
+                  >
+                    {size}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {product.promotion && (
             <span className="mt-3 inline-flex w-fit rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">
               {product.promotion}

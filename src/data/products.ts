@@ -28,6 +28,7 @@ export interface Product {
   previousPrice: number | null;
   images: string[];
   description: string;
+  sizes: string[];
 }
 
 export const FALLBACK_PRODUCT_IMAGE =
@@ -41,9 +42,10 @@ export function formatARS(value: number): string {
   }).format(value);
 }
 
-type EdgeProduct = Omit<Product, 'images' | 'description'> & {
+type EdgeProduct = Omit<Product, 'images' | 'description' | 'sizes'> & {
   images?: string[];
   description?: string;
+  sizes?: string[];
 };
 
 interface EdgeFunctionResponse {
@@ -94,6 +96,7 @@ export async function fetchProducts(): Promise<Product[]> {
   return json.products.map((product) => ({
     ...product,
     description: product.description ?? '',
+    sizes: product.sizes ?? [],
     images: product.images?.length ? product.images : [product.image],
   }));
 }
