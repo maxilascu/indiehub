@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Home, MapPin, Store, Truck, X } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Home, MapPin, Ruler, Store, Truck, X } from 'lucide-react';
 import FreeShippingBadge from '@/components/FreeShippingBadge';
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Brand, type Product } from '@/data/products';
 import { trackOutboundClick } from '@/lib/analytics';
@@ -13,10 +13,12 @@ interface Props {
 
 export default function ProductDetailModal({ product, brands, onClose, onViewBrand }: Props) {
   const [imageIndex, setImageIndex] = useState(0);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
 
   useEffect(() => {
     if (!product) return;
     setImageIndex(0);
+    setSizeGuideOpen(false);
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
@@ -143,6 +145,21 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
                   </span>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => setSizeGuideOpen((open) => !open)}
+                aria-expanded={sizeGuideOpen}
+                className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500 transition hover:text-neutral-800"
+              >
+                <Ruler className="h-3 w-3" />
+                Guía y tabla de talles
+                <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${sizeGuideOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {sizeGuideOpen && (
+                <p className="mt-2 rounded-lg bg-neutral-50 px-3 py-2 text-[11px] leading-5 text-neutral-500 ring-1 ring-neutral-100">
+                  Las medidas y la moldería son orientativas y pueden variar según cada marca y producto (fit al cuerpo, oversize, etc.). Te recomendamos consultar la guía de talles específica o canal de atención de la tienda antes de realizar tu compra.
+                </p>
+              )}
             </div>
           )}
 
