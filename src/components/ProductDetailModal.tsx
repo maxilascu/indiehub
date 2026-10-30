@@ -157,7 +157,19 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
               </button>
               {sizeGuideOpen && (
                 <p className="mt-2 rounded-lg bg-neutral-50 px-3 py-2 text-[11px] leading-5 text-neutral-500 ring-1 ring-neutral-100">
-                  Las medidas y la moldería son orientativas y pueden variar según cada marca y producto (fit al cuerpo, oversize, etc.). Te recomendamos consultar la guía de talles específica o canal de atención de la tienda antes de realizar tu compra.
+  <pre className="text-xs font-mono whitespace-pre-wrap text-neutral-600 bg-neutral-50 p-3 rounded">
+  {`📏 TABLA ESTIMATIVA DE MEDIDAS (cm)
+
+Talle   Pecho      Cintura    Cadera
+S       88 - 94    74 - 80    90 - 96
+M       95 - 101   81 - 87    97 - 103
+L      102 - 108   88 - 94   104 - 110
+XL     109 - 115   95 - 101  111 - 117
+
+* Medidas corporales orientativas. El calce final puede variar según la moldería de la marca (oversize, regular o al cuerpo).`}
+</pre>
+                  
+                  
                 </p>
               )}
             </div>
