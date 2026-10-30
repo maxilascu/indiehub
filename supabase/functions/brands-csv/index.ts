@@ -17,7 +17,11 @@ interface Brand {
   name: string;
   logo: string;
   instagram: string;
-  location: string;
+  province: string;
+  city: string;
+  hasStore: boolean;
+  address: string;
+  shipsNationwide: boolean;
   description: string;
 }
 
@@ -90,14 +94,21 @@ function mapRows(rows: Record<string, string>[]): Brand[] {
   const fallbackLogo =
     "https://images.pexels.com/photos/994523/pexels-photo-994523.jpeg?auto=compress&cs=tinysrgb&w=900";
 
-  return rows.map((row, index) => ({
-    id: index + 1,
-    name: getField(row, "Marca"),
-    logo: getField(row, "Logo_URL", "Logo URL") || fallbackLogo,
-    instagram: getField(row, "Instagram_URL", "Instagram URL", "Instagram"),
-    location: getField(row, "Ubicacion", "Ubicación"),
-    description: getField(row, "Descripcion", "Descripción"),
-  })).filter((brand) => brand.name);
+  return rows.map((row, index) => {
+    const scope = normalizeKey(getField(row, "Alcance_Envios", "Alcance Envios"));
+    return {
+      id: index + 1,
+      name: getField(row, "Marca"),
+      logo: getField(row, "Logo_URL", "Logo URL", "Imagen") || fallbackLogo,
+      instagram: getField(row, "Instagram_URL", "Instagram URL", "Instagram", "URL"),
+      province: getField(row, "Provincia"),
+      city: getField(row, "Ciudad"),
+      hasStore: normalizeKey(getField(row, "Tiene_Local", "Tiene Local")) === "si",
+      address: getField(row, "Direccion", "Dirección"),
+      shipsNationwide: scope.includes("nacional") || scope.includes("todo el pais"),
+      description: getField(row, "Descripcion", "Descripción"),
+    };
+  }).filter((brand) => brand.name);
 }
 
 Deno.serve(async (req: Request) => {

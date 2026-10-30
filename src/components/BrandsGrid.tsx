@@ -1,6 +1,15 @@
-import { ArrowUpRight, MapPin, ShoppingBag } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowUpRight, Home, MapPin, ShoppingBag, Truck } from 'lucide-react';
+import BrandLocationFilter from '@/components/BrandLocationFilter';
 import type { Brand } from '@/data/products';
 import { trackOutboundClick } from '@/lib/analytics';
+import {
+  EMPTY_BRAND_LOCATION_FILTERS,
+  filterBrandsByLocation,
+  getCityOptions,
+  getProvinceOptions,
+  type BrandLocationFilters,
+} from '@/lib/brandLocation';
 
 interface Props {
   brands: Brand[];
@@ -15,6 +24,19 @@ export default function BrandsGrid({
   error,
   onViewProducts,
 }: Props) {
+  const [locationFilters, setLocationFilters] = useState<BrandLocationFilters>(
+    EMPTY_BRAND_LOCATION_FILTERS
+  );
+  const provinceOptions = useMemo(() => getProvinceOptions(brands), [brands]);
+  const cityOptions = useMemo(
+    () => getCityOptions(brands, locationFilters.province),
+    [brands, locationFilters.province]
+  );
+  const visibleBrands = useMemo(
+    () => filterBrandsByLocation(brands, locationFilters),
+    [brands, locationFilters]
+  );
+
   return (
     <section>
       <div className="mb-6">
@@ -47,8 +69,26 @@ export default function BrandsGrid({
       )}
 
       {!loading && !error && brands.length > 0 && (
+        <div className="mb-6">
+          <BrandLocationFilter
+            filters={locationFilters}
+            provinceOptions={provinceOptions}
+            cityOptions={cityOptions}
+            resultCount={visibleBrands.length}
+            onChange={setLocationFilters}
+          />
+        </div>
+      )}
+
+      {!loading && !error && brands.length > 0 && visibleBrands.length === 0 && (
+        <p className="rounded-2xl bg-white p-8 text-center text-sm text-neutral-500">
+          No hay marcas que coincidan con esa ubicación. Probá con otra provincia o ciudad.
+        </p>
+      )}
+
+      {!loading && !error && visibleBrands.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {brands.map((brand) => (
+          {visibleBrands.map((brand) => (
             <article
               key={brand.id}
               className="group flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-neutral-900/10 hover:ring-neutral-300"
@@ -70,11 +110,30 @@ export default function BrandsGrid({
               </div>
 
               <div className="flex flex-1 flex-col p-4">
-                {brand.location && (
+                {(brand.city || brand.province) && (
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                     <MapPin className="h-3.5 w-3.5" />
-                    {brand.location}
+                    {[brand.city, brand.province].filter(Boolean).join(', ')}
                   </p>
+                )}
+                {(brand.hasStore || brand.shipsNationwide) && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {brand.hasStore && (
+                      <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                        <Home className="h-3 w-3" />
+                        Showroom
+                      </span>
+                    )}
+                    {brand.shipsNationwide && (
+                      <span className="flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
+                        <Truck className="h-3 w-3" />
+                        Envíos a todo el país
+                      </span>
+                    )}
+                  </div>
+                )}
+                {brand.hasStore && brand.address && (
+                  <p className="mt-2 text-xs text-neutral-500">{brand.address}</p>
                 )}
                 <p className="mt-2 line-clamp-3 text-sm leading-6 text-neutral-600">
                   {brand.description || 'Una marca independiente para descubrir.'}

@@ -3,7 +3,11 @@ export interface Brand {
   name: string;
   logo: string;
   instagram: string;
-  location: string;
+  province: string;
+  city: string;
+  hasStore: boolean;
+  address: string;
+  shipsNationwide: boolean;
   description: string;
 }
 
