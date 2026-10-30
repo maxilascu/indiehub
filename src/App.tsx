@@ -336,7 +336,12 @@ export default function App() {
 
       {view === 'about' && <AboutView />}
 
-      <ProductDetailModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+      <ProductDetailModal
+        product={selectedProduct}
+        brands={brands}
+        onClose={() => setSelectedProduct(null)}
+        onViewBrand={handleViewProducts}
+      />
 
       <FiltersPanel
         open={filtersOpen}
