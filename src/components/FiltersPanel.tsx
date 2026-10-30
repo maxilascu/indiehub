@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Check, SlidersHorizontal, X } from 'lucide-react';
+import LocationSelects from '@/components/LocationSelects';
 
 export type SortOption = 'recent' | 'price-asc' | 'price-desc' | 'promotions';
 
@@ -7,10 +8,21 @@ export interface FilterValues {
   category: string;
   gender: string;
   styles: string[];
-  location: string;
+  province: string;
+  city: string;
   minPrice: number;
   maxPrice: number;
   sort: SortOption;
+}
+
+export function countActiveFilters(values: FilterValues, priceMin: number, priceMax: number): number {
+  return (
+    Number(values.category !== 'Todos') +
+    Number(values.gender !== 'Todos') +
+    Number(values.styles.length > 0) +
+    Number(Boolean(values.province)) +
+    Number(values.minPrice !== priceMin || values.maxPrice !== priceMax)
+  );
 }
 
 interface Props {
@@ -19,10 +31,10 @@ interface Props {
   categoryOptions: string[];
   genderOptions: string[];
   styleOptions: string[];
-  locationOptions: string[];
+  provinceOptions: string[];
+  cityOptions: string[];
   minPriceLimit: number;
   maxPriceLimit: number;
-  resultCount: number;
   onChange: (values: FilterValues) => void;
   onApply: () => void;
   onClear: () => void;
@@ -35,10 +47,10 @@ export default function FiltersPanel({
   categoryOptions,
   genderOptions,
   styleOptions,
-  locationOptions,
+  provinceOptions,
+  cityOptions,
   minPriceLimit,
   maxPriceLimit,
-  resultCount,
   onChange,
   onApply,
   onClear,
@@ -50,6 +62,8 @@ export default function FiltersPanel({
       : [...values.styles, style];
     onChange({ ...values, styles });
   };
+
+  const activeCount = countActiveFilters(values, minPriceLimit, maxPriceLimit);
 
   return (
     <>
@@ -169,18 +183,16 @@ export default function FiltersPanel({
           </FilterSection>
 
           <FilterSection title="Ubicación">
-            <select
-              value={values.location}
-              onChange={(event) => onChange({ ...values, location: event.target.value })}
-              className="w-full rounded-xl border-0 bg-neutral-100 px-3.5 py-3 text-sm font-medium text-neutral-800 outline-none ring-1 ring-transparent transition focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="Todas">Todas</option>
-              {locationOptions.map((location) => (
-                <option key={location} value={location}>
-                  {location}
-                </option>
-              ))}
-            </select>
+            <LocationSelects
+              province={values.province}
+              city={values.city}
+              provinceOptions={provinceOptions}
+              cityOptions={cityOptions}
+              onChange={(location) => onChange({ ...values, ...location })}
+            />
+            <p className="mt-2 text-[11px] text-neutral-400">
+              Incluye marcas con local en la zona y marcas que envían a todo el país.
+            </p>
           </FilterSection>
 
           <FilterSection title="Rango de precio">
@@ -218,7 +230,7 @@ export default function FiltersPanel({
               onClick={onApply}
               className="flex-[1.5] rounded-xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 active:scale-[0.98]"
             >
-              Aplicar filtros ({resultCount})
+              {activeCount > 0 ? `Aplicar filtros (${activeCount})` : 'Aplicar filtros'}
             </button>
           </div>
         </div>

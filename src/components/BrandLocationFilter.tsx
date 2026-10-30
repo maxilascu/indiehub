@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Home, Truck, X } from 'lucide-react';
+import LocationSelects from '@/components/LocationSelects';
 import type { BrandLocationFilters } from '@/lib/brandLocation';
 
 interface Props {
@@ -9,9 +10,6 @@ interface Props {
   resultCount: number;
   onChange: (filters: BrandLocationFilters) => void;
 }
-
-const selectClass =
-  'w-full rounded-xl border-0 bg-white px-3.5 py-3 text-sm font-medium text-neutral-800 shadow-sm outline-none ring-1 ring-neutral-200 transition hover:ring-neutral-300 focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400';
 
 export default function BrandLocationFilter({
   filters,
@@ -25,48 +23,13 @@ export default function BrandLocationFilter({
 
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-neutral-200/80 sm:p-5">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] text-neutral-500">
-            Provincia
-          </span>
-          <select
-            value={filters.province}
-            onChange={(event) =>
-              onChange({ ...filters, province: event.target.value, city: '' })
-            }
-            className={selectClass}
-          >
-            <option value="">Todas las provincias</option>
-            {provinceOptions.map((province) => (
-              <option key={province} value={province}>
-                {province}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] text-neutral-500">
-            Ciudad
-          </span>
-          <select
-            value={filters.city}
-            disabled={!filters.province}
-            onChange={(event) => onChange({ ...filters, city: event.target.value })}
-            className={selectClass}
-          >
-            <option value="">
-              {filters.province ? 'Todas las ciudades' : 'Elegí una provincia primero'}
-            </option>
-            {cityOptions.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <LocationSelects
+        province={filters.province}
+        city={filters.city}
+        provinceOptions={provinceOptions}
+        cityOptions={cityOptions}
+        onChange={(location) => onChange({ ...filters, ...location })}
+      />
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <FilterChip

@@ -5,6 +5,7 @@ import Hero from '@/components/Hero';
 import PromotionsBanner from '@/components/PromotionsBanner';
 import BrandsGrid from '@/components/BrandsGrid';
 import FiltersPanel, {
+  countActiveFilters,
   type FilterValues,
   type SortOption,
 } from '@/components/FiltersPanel';
@@ -18,6 +19,11 @@ import {
   type Product,
   type Brand,
 } from '@/data/products';
+import {
+  filterBrandsByLocation,
+  getCityOptions,
+  getProvinceOptions,
+} from '@/lib/brandLocation';
 
 const DEFAULT_SORT: SortOption = 'recent';
 
@@ -38,7 +44,8 @@ export default function App() {
     category: 'Todos',
     gender: 'Todos',
     styles: [],
-    location: 'Todas',
+    province: '',
+    city: '',
     minPrice: 0,
     maxPrice: 0,
     sort: DEFAULT_SORT,
@@ -121,9 +128,10 @@ export default function App() {
     () => extractUniqueValues(products, 'style'),
     [products]
   );
-  const locations = useMemo(
-    () => extractUniqueValues(products, 'location'),
-    [products]
+  const provinceOptions = useMemo(() => getProvinceOptions(brands), [brands]);
+  const cityOptions = useMemo(
+    () => getCityOptions(brands, draftFilters.province),
+    [brands, draftFilters.province]
   );
 
   const categoryOptions = Array.from(
@@ -133,6 +141,16 @@ export default function App() {
 
   const filterProducts = (values: FilterValues): Product[] => {
     const search = query.trim().toLowerCase();
+    const locationBrands = values.province
+      ? new Set(
+          filterBrandsByLocation(brands, {
+            province: values.province,
+            city: values.city,
+            storeOnly: false,
+            nationwideOnly: false,
+          }).map((brand) => brand.name)
+        )
+      : null;
     const result = products.filter((product) => {
       const matchesBrand = !selectedBrand || product.brand === selectedBrand;
       const matchesCategory =
@@ -141,8 +159,7 @@ export default function App() {
         values.gender === 'Todos' || product.gender === values.gender;
       const matchesStyle =
         values.styles.length === 0 || values.styles.includes(product.style);
-      const matchesLocation =
-        values.location === 'Todas' || product.location === values.location;
+      const matchesLocation = !locationBrands || locationBrands.has(product.brand);
       const matchesPrice =
         product.price >= values.minPrice && product.price <= values.maxPrice;
       const matchesSearch =
@@ -177,21 +194,11 @@ export default function App() {
 
   const filtered = useMemo(
     () => filterProducts(filters),
-    [products, query, filters, selectedBrand]
-  );
-  const previewResults = useMemo(
-    () => filterProducts(draftFilters).length,
-    [products, query, draftFilters, selectedBrand]
+    [products, brands, query, filters, selectedBrand]
   );
 
   const activeFilterCount =
-    Number(filters.category !== 'Todos') +
-    Number(filters.gender !== 'Todos') +
-    Number(filters.styles.length > 0) +
-    Number(filters.location !== 'Todas') +
-    Number(filters.minPrice !== priceLimits.min) +
-    Number(filters.maxPrice !== priceLimits.max) +
-    Number(filters.sort !== DEFAULT_SORT) +
+    countActiveFilters(filters, priceLimits.min, priceLimits.max) +
     Number(Boolean(selectedBrand));
 
   const goToBrands = () => setView('brands');
@@ -229,7 +236,8 @@ export default function App() {
       category: 'Todos',
       gender: 'Todos',
       styles: [],
-      location: 'Todas',
+      province: '',
+      city: '',
       minPrice: priceLimits.min,
       maxPrice: priceLimits.max,
       sort: DEFAULT_SORT,
@@ -319,10 +327,10 @@ export default function App() {
         categoryOptions={categoryOptions}
         genderOptions={genderOptions}
         styleOptions={styles}
-        locationOptions={locations}
+        provinceOptions={provinceOptions}
+        cityOptions={cityOptions}
         minPriceLimit={priceLimits.min}
         maxPriceLimit={priceLimits.max}
-        resultCount={previewResults}
         onChange={setDraftFilters}
         onApply={applyFilters}
         onClear={clearFilters}
