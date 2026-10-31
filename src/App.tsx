@@ -13,6 +13,8 @@ import ProductGrid from '@/components/ProductGrid';
 import ProductDetailModal from '@/components/ProductDetailModal';
 import AboutView from '@/components/AboutView';
 import AboutFooter from '@/components/AboutFooter';
+import FavoritesView from '@/components/FavoritesView';
+import { useFavoriteProducts, useFavoriteBrands } from '@/hooks/useFavorites';
 import {
   fetchBrands,
   fetchProducts,
@@ -55,6 +57,10 @@ export default function App() {
     sort: DEFAULT_SORT,
   });
   const [draftFilters, setDraftFilters] = useState<FilterValues>(filters);
+
+  const { isFavorite: isProductFavorite, toggle: toggleProductFavorite, count: productFavoriteCount } = useFavoriteProducts();
+  const { isFavorite: isBrandFavorite, toggle: toggleBrandFavorite, count: brandFavoriteCount } = useFavoriteBrands();
+  const favoritesCount = productFavoriteCount + brandFavoriteCount;
 
   useEffect(() => {
     let cancelled = false;
@@ -207,6 +213,7 @@ export default function App() {
 
   const goToBrands = () => setView('brands');
   const goToExplore = () => setView('explore');
+  const goToFavorites = () => setView('favorites');
   const goToAbout = () => setView('about');
 
   const handleViewProducts = (brand: string) => {
@@ -257,9 +264,11 @@ export default function App() {
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <Header
         view={view}
+        favoritesCount={favoritesCount}
         onPromotionsClick={handleHeaderPromotions}
         onBrandsClick={goToBrands}
         onExploreClick={goToExplore}
+        onFavoritesClick={goToFavorites}
         onAboutClick={goToAbout}
       />
 
@@ -317,6 +326,8 @@ export default function App() {
                 loading={loading}
                 error={error}
                 onSelectProduct={setSelectedProduct}
+                isFavorite={isProductFavorite}
+                onToggleFavorite={toggleProductFavorite}
               />
             </div>
           </main>
@@ -330,8 +341,19 @@ export default function App() {
             loading={brandsLoading}
             error={brandsError}
             onViewProducts={handleViewProducts}
+            isFavorite={isBrandFavorite}
+            onToggleFavorite={toggleBrandFavorite}
           />
         </main>
+      )}
+
+      {view === 'favorites' && (
+        <FavoritesView
+          products={products}
+          brands={brands}
+          onSelectProduct={setSelectedProduct}
+          onViewProducts={handleViewProducts}
+        />
       )}
 
       {view === 'about' && <AboutView />}

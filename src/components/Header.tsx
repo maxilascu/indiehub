@@ -1,22 +1,26 @@
 import { useState } from 'react';
-import { Sparkles, Flame } from 'lucide-react';
+import { Heart, Sparkles, Flame } from 'lucide-react';
 import JoinBrandModal from '@/components/JoinBrandModal';
 
-export type View = 'explore' | 'brands' | 'about';
+export type View = 'explore' | 'brands' | 'favorites' | 'about';
 
 interface Props {
   view: View;
+  favoritesCount: number;
   onPromotionsClick: () => void;
   onBrandsClick: () => void;
   onExploreClick: () => void;
+  onFavoritesClick: () => void;
   onAboutClick: () => void;
 }
 
 export default function Header({
   view,
+  favoritesCount,
   onPromotionsClick,
   onBrandsClick,
   onExploreClick,
+  onFavoritesClick,
   onAboutClick,
 }: Props) {
   const [joinOpen, setJoinOpen] = useState(false);
@@ -49,10 +53,27 @@ export default function Header({
         <nav className="hidden items-center gap-7 text-sm font-medium text-neutral-600 md:flex">
           {navButton('Explorar', view === 'explore', onExploreClick)}
           {navButton('Marcas', view === 'brands', onBrandsClick)}
+          {navButton('Favoritos', view === 'favorites', onFavoritesClick)}
           {navButton('Quiénes somos', view === 'about', onAboutClick)}
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={onFavoritesClick}
+            aria-label="Mis favoritos"
+            className={`relative grid h-9 w-9 place-items-center rounded-full transition active:scale-95 ${
+              view === 'favorites'
+                ? 'bg-red-50 text-red-500 ring-1 ring-red-200'
+                : 'text-neutral-600 hover:bg-neutral-100 hover:text-red-500'
+            }`}
+          >
+            <Heart className="h-4 w-4" fill={favoritesCount > 0 ? 'currentColor' : 'none'} />
+            {favoritesCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {favoritesCount}
+              </span>
+            )}
+          </button>
           <button
             onClick={onPromotionsClick}
             className="flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 ring-1 ring-red-200 transition hover:bg-red-100 active:scale-[0.98] sm:px-4"
@@ -68,6 +89,13 @@ export default function Header({
           </button>
         </div>
       </div>
+
+      <nav className="flex items-center justify-center gap-6 border-t border-neutral-100 py-2 text-sm font-medium text-neutral-600 md:hidden">
+        {navButton('Explorar', view === 'explore', onExploreClick)}
+        {navButton('Marcas', view === 'brands', onBrandsClick)}
+        {navButton('Favoritos', view === 'favorites', onFavoritesClick)}
+        {navButton('Quiénes somos', view === 'about', onAboutClick)}
+      </nav>
 
       <JoinBrandModal open={joinOpen} onClose={() => setJoinOpen(false)} />
     </header>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowUpRight, Home, MapPin, ShoppingBag, Truck } from 'lucide-react';
 import BrandLocationFilter from '@/components/BrandLocationFilter';
+import FavoriteButton from '@/components/FavoriteButton';
 import type { Brand } from '@/data/products';
 import { trackOutboundClick } from '@/lib/analytics';
 import {
@@ -16,6 +17,8 @@ interface Props {
   loading: boolean;
   error: string | null;
   onViewProducts: (brand: string) => void;
+  isFavorite?: (brand: Brand) => boolean;
+  onToggleFavorite?: (brand: Brand) => void;
 }
 
 export default function BrandsGrid({
@@ -23,6 +26,8 @@ export default function BrandsGrid({
   loading,
   error,
   onViewProducts,
+  isFavorite,
+  onToggleFavorite,
 }: Props) {
   const [locationFilters, setLocationFilters] = useState<BrandLocationFilters>(
     EMPTY_BRAND_LOCATION_FILTERS
@@ -107,6 +112,14 @@ export default function BrandsGrid({
                 <span className="absolute bottom-3 left-4 text-lg font-bold text-white drop-shadow-sm">
                   {brand.name}
                 </span>
+                {onToggleFavorite && (
+                  <FavoriteButton
+                    active={Boolean(isFavorite?.(brand))}
+                    onClick={() => onToggleFavorite(brand)}
+                    size="md"
+                    className="absolute right-3 top-3"
+                  />
+                )}
               </div>
 
               <div className="flex flex-1 flex-col p-4">

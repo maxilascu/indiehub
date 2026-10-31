@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Home, MapPin, Store, Truck, X } from 'lucide-react';
+import { ArrowUpRight, Heart, Home, MapPin, Store, Truck, X } from 'lucide-react';
 import FreeShippingBadge from '@/components/FreeShippingBadge';
 import SizeGuide from '@/components/SizeGuide';
+import { useFavoriteProducts } from '@/hooks/useFavorites';
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Brand, type Product } from '@/data/products';
 import { trackOutboundClick } from '@/lib/analytics';
 
@@ -14,6 +15,7 @@ interface Props {
 
 export default function ProductDetailModal({ product, brands, onClose, onViewBrand }: Props) {
   const [imageIndex, setImageIndex] = useState(0);
+  const { isFavorite, toggle } = useFavoriteProducts();
 
   useEffect(() => {
     if (!product) return;
@@ -92,14 +94,27 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-600">
               {product.brand}
             </p>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Cerrar detalle"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => toggle(product)}
+                aria-label={isFavorite(product) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+                aria-pressed={isFavorite(product)}
+                className={`grid h-8 w-8 place-items-center rounded-full transition active:scale-90 ${
+                  isFavorite(product) ? 'text-red-500' : 'text-neutral-400 hover:text-red-500'
+                }`}
+              >
+                <Heart className="h-4 w-4" fill={isFavorite(product) ? 'currentColor' : 'none'} />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Cerrar detalle"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <h2 id="product-detail-title" className="mt-2 text-xl font-bold leading-tight text-neutral-900 sm:text-2xl">

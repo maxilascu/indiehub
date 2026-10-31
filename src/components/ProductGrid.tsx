@@ -7,9 +7,11 @@ interface Props {
   loading: boolean;
   error: string | null;
   onSelectProduct: (product: Product) => void;
+  isFavorite?: (product: Product) => boolean;
+  onToggleFavorite?: (product: Product) => void;
 }
 
-export default function ProductGrid({ products, loading, error, onSelectProduct }: Props) {
+export default function ProductGrid({ products, loading, error, onSelectProduct, isFavorite, onToggleFavorite }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -49,7 +51,7 @@ export default function ProductGrid({ products, loading, error, onSelectProduct 
   return (
     <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:grid-cols-5 xl:grid-cols-6">
       {products.map((p) => (
-        <ProductCard key={p.id} product={p} onOpen={onSelectProduct} />
+        <ProductCard key={p.id} product={p} onOpen={onSelectProduct} isFavorite={isFavorite?.(p)} onToggleFavorite={onToggleFavorite} />
       ))}
     </div>
   );

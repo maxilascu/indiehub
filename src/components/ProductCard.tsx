@@ -1,18 +1,28 @@
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Product } from '@/data/products';
 import FreeShippingBadge from '@/components/FreeShippingBadge';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface Props {
   product: Product;
   onOpen: (product: Product) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (product: Product) => void;
 }
 
-export default function ProductCard({ product, onOpen }: Props) {
+export default function ProductCard({ product, onOpen, isFavorite, onToggleFavorite }: Props) {
   const hasPreviousPrice = Boolean(
     product.promotion && product.previousPrice && product.previousPrice > product.price
   );
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-md bg-white ring-1 ring-neutral-200/80 transition duration-300 hover:shadow-md hover:shadow-neutral-900/10 hover:ring-neutral-300">
+    <article className="group relative flex flex-col overflow-hidden rounded-md bg-white ring-1 ring-neutral-200/80 transition duration-300 hover:shadow-md hover:shadow-neutral-900/10 hover:ring-neutral-300">
+      {onToggleFavorite && (
+        <FavoriteButton
+          active={Boolean(isFavorite)}
+          onClick={() => onToggleFavorite(product)}
+          className="absolute right-1.5 top-1.5 z-10"
+        />
+      )}
       <button
         type="button"
         onClick={() => onOpen(product)}
