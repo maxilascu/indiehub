@@ -1,19 +1,32 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Brand, Product } from '@/data/products';
 
-const PRODUCTS_KEY = 'indiehub:favorites:products';
-const BRANDS_KEY = 'indiehub:favorites:brands';
+const STORAGE_KEY = 'indiehub_favorites';
 
-function read(key: string): string[] {
+interface FavoritesData {
+  products: string[];
+  brands: string[];
+}
+
+function read(): FavoritesData {
   try {
-    const raw = window.localStorage.getItem(key);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === 'string')
-      : [];
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const obj = parsed as Partial<FavoritesData>;
+      return {
+        products: Array.isArray(obj.products)
+          ? obj.products.filter((item): item is string => typeof item === 'string')
+          : [],
+        brands: Array.isArray(obj.brands)
+          ? obj.brands.filter((item): item is string => typeof item === 'string')
+          : [],
+      };
+    }
   } catch {
-    return [];
+    // corrupt or unavailable storage — start fresh
   }
+  return { products: [], brands: [] };
 }
 
 export function productKey(product: Product): string {
@@ -24,8 +37,7 @@ export function brandKey(brand: Brand): string {
   return brand.name;
 }
 
-let productFavorites = read(PRODUCTS_KEY);
-let brandFavorites = read(BRANDS_KEY);
+let state: FavoritesData = read();
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -39,33 +51,20 @@ function subscribe(listener: () => void) {
   };
 }
 
-function setProductFavorites(next: string[]) {
-  productFavorites = next;
+function persist(next: FavoritesData) {
+  state = next;
   try {
-    window.localStorage.setItem(PRODUCTS_KEY, JSON.stringify(next));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
-    // Storage may be unavailable (private mode); in-session state still works.
-  }
-  notify();
-}
-
-function setBrandFavorites(next: string[]) {
-  brandFavorites = next;
-  try {
-    window.localStorage.setItem(BRANDS_KEY, JSON.stringify(next));
-  } catch {
-    // ignore
+    // private mode or storage full — in-session state still works
   }
   notify();
 }
 
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
-    if (event.key === PRODUCTS_KEY) {
-      productFavorites = read(PRODUCTS_KEY);
-      notify();
-    } else if (event.key === BRANDS_KEY) {
-      brandFavorites = read(BRANDS_KEY);
+    if (event.key === STORAGE_KEY) {
+      state = read();
       notify();
     }
   });
@@ -74,17 +73,16 @@ if (typeof window !== 'undefined') {
 export function useFavoriteProducts() {
   const favorites = useSyncExternalStore(
     subscribe,
-    () => productFavorites,
-    () => productFavorites
+    () => state.products,
+    () => state.products
   );
   const toggle = useCallback(
     (product: Product) => {
       const key = productKey(product);
-      setProductFavorites(
-        favorites.includes(key)
-          ? favorites.filter((item) => item !== key)
-          : [...favorites, key]
-      );
+      const next = favorites.includes(key)
+        ? favorites.filter((item) => item !== key)
+        : [...favorites, key];
+      persist({ ...state, products: next });
     },
     [favorites]
   );
@@ -98,17 +96,16 @@ export function useFavoriteProducts() {
 export function useFavoriteBrands() {
   const favorites = useSyncExternalStore(
     subscribe,
-    () => brandFavorites,
-    () => brandFavorites
+    () => state.brands,
+    () => state.brands
   );
   const toggle = useCallback(
     (brand: Brand) => {
       const key = brandKey(brand);
-      setBrandFavorites(
-        favorites.includes(key)
-          ? favorites.filter((item) => item !== key)
-          : [...favorites, key]
-      );
+      const next = favorites.includes(key)
+        ? favorites.filter((item) => item !== key)
+        : [...favorites, key];
+      persist({ ...state, brands: next });
     },
     [favorites]
   );
