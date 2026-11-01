@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowUpRight, Home, MapPin, Map as MapIcon, ShoppingBag, Truck } from 'lucide-react';
+import { ArrowUpRight, Home, MapPin, ShoppingBag, Truck } from 'lucide-react';
 import BrandLocationFilter from '@/components/BrandLocationFilter';
 import FavoriteButton from '@/components/FavoriteButton';
 import type { Brand } from '@/data/products';
@@ -19,7 +19,6 @@ interface Props {
   onViewProducts: (brand: string) => void;
   isFavorite?: (brand: Brand) => boolean;
   onToggleFavorite?: (brand: Brand) => void;
-  onOpenMap?: () => void;
 }
 
 export default function BrandsGrid({
@@ -29,7 +28,6 @@ export default function BrandsGrid({
   onViewProducts,
   isFavorite,
   onToggleFavorite,
-  onOpenMap,
 }: Props) {
   const [locationFilters, setLocationFilters] = useState<BrandLocationFilters>(
     EMPTY_BRAND_LOCATION_FILTERS
@@ -76,7 +74,7 @@ export default function BrandsGrid({
       )}
 
       {!loading && !error && brands.length > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="mb-6">
           <BrandLocationFilter
             filters={locationFilters}
             provinceOptions={provinceOptions}
@@ -84,15 +82,6 @@ export default function BrandsGrid({
             resultCount={visibleBrands.length}
             onChange={setLocationFilters}
           />
-          {onOpenMap && (
-            <button
-              onClick={onOpenMap}
-              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98]"
-            >
-              <MapIcon className="h-4 w-4" />
-              Ver en mapa
-            </button>
-          )}
         </div>
       )}
 

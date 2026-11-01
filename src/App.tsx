@@ -15,7 +15,6 @@ import AboutView from '@/components/AboutView';
 import AboutFooter from '@/components/AboutFooter';
 import FavoritesView from '@/components/FavoritesView';
 import TermsModal from '@/components/TermsModal';
-import MapView from '@/components/MapView';
 import { useFavoriteProducts, useFavoriteBrands } from '@/hooks/useFavorites';
 import {
   fetchBrands,
@@ -67,8 +66,6 @@ export default function App() {
   });
   const [draftFilters, setDraftFilters] = useState<FilterValues>(filters);
   const [termsOpen, setTermsOpen] = useState(false);
-  const [mapOpen, setMapOpen] = useState(false);
-  const [mapSelectedBrand, setMapSelectedBrand] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = () => setTermsOpen(true);
@@ -387,26 +384,9 @@ export default function App() {
             onViewProducts={handleViewProducts}
             isFavorite={isBrandFavorite}
             onToggleFavorite={toggleBrandFavorite}
-            onOpenMap={() => setMapOpen(true)}
           />
         </main>
       )}
-
-      <MapView
-        open={mapOpen}
-        brands={brands}
-        userLocation={filters.userLocation}
-        selectedBrand={mapSelectedBrand}
-        onSelectBrand={(name) => {
-          setMapOpen(false);
-          setMapSelectedBrand(null);
-          handleViewProducts(name);
-        }}
-        onClose={() => {
-          setMapOpen(false);
-          setMapSelectedBrand(null);
-        }}
-      />
 
       {view === 'favorites' && (
         <FavoritesView
