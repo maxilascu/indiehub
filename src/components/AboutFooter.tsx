@@ -68,7 +68,19 @@ export default function AboutFooter() {
       </div>
 
       <div className="border-t border-neutral-200 py-6 text-center text-xs text-neutral-400">
-        © {new Date().getFullYear()} IndieHub. Todos los derechos reservados.
+        <p className="mb-2">
+          © {new Date().getFullYear()} IndieHub. Todos los derechos reservados.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            const event = new CustomEvent('indiehub:open-terms');
+            window.dispatchEvent(event);
+          }}
+          className="font-medium text-neutral-400 underline-offset-2 transition hover:text-neutral-700 hover:underline"
+        >
+          Términos y Condiciones
+        </button>
       </div>
     </footer>
   );

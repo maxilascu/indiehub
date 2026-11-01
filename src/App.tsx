@@ -14,6 +14,7 @@ import ProductDetailModal from '@/components/ProductDetailModal';
 import AboutView from '@/components/AboutView';
 import AboutFooter from '@/components/AboutFooter';
 import FavoritesView from '@/components/FavoritesView';
+import TermsModal from '@/components/TermsModal';
 import { useFavoriteProducts, useFavoriteBrands } from '@/hooks/useFavorites';
 import {
   fetchBrands,
@@ -57,6 +58,13 @@ export default function App() {
     sort: DEFAULT_SORT,
   });
   const [draftFilters, setDraftFilters] = useState<FilterValues>(filters);
+  const [termsOpen, setTermsOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setTermsOpen(true);
+    window.addEventListener('indiehub:open-terms', handler);
+    return () => window.removeEventListener('indiehub:open-terms', handler);
+  }, []);
 
   const { isFavorite: isProductFavorite, toggle: toggleProductFavorite, count: productFavoriteCount } = useFavoriteProducts();
   const { isFavorite: isBrandFavorite, toggle: toggleBrandFavorite, count: brandFavoriteCount } = useFavoriteBrands();
@@ -389,8 +397,16 @@ export default function App() {
             INDIE<span className="text-emerald-500">HUB</span> · Hecho para las
             marcas independientes de Argentina
           </p>
+          <button
+            onClick={() => setTermsOpen(true)}
+            className="mt-2 text-xs font-medium text-neutral-400 underline-offset-2 transition hover:text-neutral-700 hover:underline"
+          >
+            Términos y Condiciones
+          </button>
         </footer>
       )}
+
+      <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
     </div>
   );
 }
