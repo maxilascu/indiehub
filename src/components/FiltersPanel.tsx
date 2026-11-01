@@ -90,6 +90,13 @@ export default function FiltersPanel({
   const activeCount = countActiveFilters(values, minPriceLimit, maxPriceLimit);
   const serviceArea = resolveServiceArea(values);
 
+  const selectStoreType = (storeType: StoreType) =>
+    onChange({
+      ...values,
+      storeType,
+      shippingCoverage: storeType === 'online' ? values.shippingCoverage : 'all',
+    });
+
   return (
     <>
       <div
@@ -220,58 +227,72 @@ export default function FiltersPanel({
             </p>
           </FilterSection>
 
-          <FilterSection title="Tu ubicación">
-            <UserLocationButton
-              userLocation={values.userLocation}
-              onLocate={(location) => onChange({ ...values, userLocation: location })}
-              onClear={() => onChange({ ...values, userLocation: null })}
-            />
-            <p className="mt-2 text-[11px] text-neutral-400">
-              Si no das permiso, elegí provincia y ciudad en Ubicación.
-            </p>
-          </FilterSection>
-
-          <FilterSection title="¿Realiza envíos a mi ubicación?">
-            <div className="flex flex-wrap gap-2">
-              {SHIPPING_COVERAGE_OPTIONS.map((option) => (
-                <OptionChip
-                  key={option.value}
-                  active={values.shippingCoverage === option.value}
-                  disabled={!serviceArea}
-                  onClick={() => onChange({ ...values, shippingCoverage: option.value })}
-                  label={option.label}
-                />
-              ))}
-            </div>
-            <p className="mt-2 text-[11px] text-neutral-400">
-              {serviceArea
-                ? 'Sí muestra las marcas que llegan a tu zona. No muestra las que no llegan.'
-                : 'Activá tu ubicación o elegí provincia y ciudad para usar este filtro.'}
-            </p>
-          </FilterSection>
-
           <FilterSection title="Tipo de tienda">
             <div className="flex flex-wrap gap-2">
               <OptionChip
                 active={values.storeType === 'all'}
-                onClick={() => onChange({ ...values, storeType: 'all' })}
+                onClick={() => selectStoreType('all')}
                 label="Todos"
               />
               <OptionChip
                 active={values.storeType === 'online'}
-                onClick={() => onChange({ ...values, storeType: 'online' })}
+                onClick={() => selectStoreType('online')}
                 label="Solo online"
               />
               <OptionChip
                 active={values.storeType === 'physical'}
-                onClick={() => onChange({ ...values, storeType: 'physical' })}
+                onClick={() => selectStoreType('physical')}
                 label="Local físico / Showroom"
               />
             </div>
 
+            <div
+              aria-hidden={values.storeType !== 'online'}
+              className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+                values.storeType === 'online'
+                  ? 'grid-rows-[1fr] opacity-100'
+                  : 'grid-rows-[0fr] opacity-0'
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="mt-4 space-y-4 rounded-xl bg-neutral-50 p-4 ring-1 ring-neutral-100">
+                  <UserLocationButton
+                    userLocation={values.userLocation}
+                    onLocate={(location) => onChange({ ...values, userLocation: location })}
+                    onClear={() => onChange({ ...values, userLocation: null })}
+                  />
+                  <div>
+                    <p className="mb-2 text-xs font-semibold text-neutral-600">
+                      ¿Realiza envíos a mi ubicación?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {SHIPPING_COVERAGE_OPTIONS.map((option) => (
+                        <OptionChip
+                          key={option.value}
+                          active={values.shippingCoverage === option.value}
+                          onClick={() => onChange({ ...values, shippingCoverage: option.value })}
+                          label={option.label}
+                        />
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-neutral-400">
+                      {serviceArea
+                        ? 'Sí muestra las marcas que llegan a tu zona. No muestra las que no llegan.'
+                        : 'Usá tu ubicación o elegí provincia y ciudad en Ubicación.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {values.storeType === 'physical' && (
               <div className="mt-4 rounded-xl bg-neutral-50 p-4 ring-1 ring-neutral-100">
-                <div className="flex items-center justify-between">
+                <UserLocationButton
+                  userLocation={values.userLocation}
+                  onLocate={(location) => onChange({ ...values, userLocation: location })}
+                  onClear={() => onChange({ ...values, userLocation: null })}
+                />
+                <div className="mt-4 flex items-center justify-between">
                   <label className="text-xs font-semibold text-neutral-600">
                     Distancia máxima
                   </label>
@@ -292,7 +313,7 @@ export default function FiltersPanel({
                 <p className="mt-1 text-[11px] text-neutral-400">
                   {values.userLocation
                     ? 'Se filtran las marcas dentro del radio desde tu ubicación.'
-                    : 'Activá "Tu ubicación" para aplicar el radio.'}
+                    : 'Usá tu ubicación para aplicar el radio.'}
                 </p>
               </div>
             )}
@@ -386,21 +407,18 @@ function PriceInput({
 
 function OptionChip({
   active,
-  disabled = false,
   onClick,
   label,
 }: {
   active: boolean;
-  disabled?: boolean;
   onClick: () => void;
   label: string;
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
       aria-pressed={active}
-      className={`rounded-full px-3.5 py-2 text-xs font-semibold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`rounded-full px-3.5 py-2 text-xs font-semibold transition active:scale-95 ${
         active
           ? 'bg-neutral-900 text-white shadow-sm'
           : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'
