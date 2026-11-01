@@ -26,9 +26,11 @@ import {
 } from '@/data/products';
 import {
   filterBrandsByLocation,
+  filterBrandsByShipping,
   filterBrandsByStoreType,
   getCityOptions,
   getProvinceOptions,
+  resolveServiceArea,
 } from '@/lib/brandLocation';
 
 const DEFAULT_SORT: SortOption = 'recent';
@@ -57,6 +59,7 @@ export default function App() {
     shippingOnly: false,
     storeType: 'all',
     maxDistance: 50,
+    shippingCoverage: 'all',
     userLocation: null,
     minPrice: 0,
     maxPrice: 0,
@@ -175,6 +178,15 @@ export default function App() {
           }).map((brand) => brand.name)
         )
       : null;
+    const shippingBrands = values.shippingCoverage !== 'all'
+      ? new Set(
+          filterBrandsByShipping(
+            brands,
+            values.shippingCoverage,
+            resolveServiceArea(values)
+          ).map((brand) => brand.name)
+        )
+      : null;
     const locationBrands = values.province || values.storeOnly || values.shippingOnly
       ? new Set(
           filterBrandsByLocation(brands, {
@@ -195,6 +207,7 @@ export default function App() {
         values.styles.length === 0 || values.styles.includes(product.style);
       const matchesLocation = !locationBrands || locationBrands.has(product.brand);
       const matchesStoreType = !storeTypeBrands || storeTypeBrands.has(product.brand);
+      const matchesShipping = !shippingBrands || shippingBrands.has(product.brand);
       const matchesPrice =
         product.price >= values.minPrice && product.price <= values.maxPrice;
       const matchesSearch =
@@ -213,6 +226,7 @@ export default function App() {
         matchesStyle &&
         matchesLocation &&
         matchesStoreType &&
+        matchesShipping &&
         matchesPrice &&
         matchesSearch
       );
@@ -279,6 +293,7 @@ export default function App() {
       shippingOnly: false,
       storeType: 'all',
       maxDistance: 50,
+      shippingCoverage: 'all',
       userLocation: null,
       minPrice: priceLimits.min,
       maxPrice: priceLimits.max,

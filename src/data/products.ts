@@ -12,6 +12,8 @@ export interface Brand {
   description: string;
   lat: number | null;
   lng: number | null;
+  sendsNational: boolean;
+  shippingZones: string[];
 }
 
 export interface Product {
@@ -73,7 +75,13 @@ export async function fetchBrands(): Promise<Brand[]> {
   if (!json.brands || !Array.isArray(json.brands)) {
     throw new Error('Formato de marcas inválido');
   }
-  return json.brands;
+  return json.brands.map((brand) => ({
+    ...brand,
+    lat: brand.lat ?? null,
+    lng: brand.lng ?? null,
+    sendsNational: Boolean(brand.sendsNational),
+    shippingZones: brand.shippingZones ?? [],
+  }));
 }
 
 export async function fetchProducts(): Promise<Product[]> {

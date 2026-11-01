@@ -14,6 +14,48 @@ export const EMPTY_BRAND_LOCATION_FILTERS: BrandLocationFilters = {
   shippingOnly: false,
 };
 
+export interface GeoArea {
+  province: string;
+  city: string;
+  partido: string;
+}
+
+export interface UserLocation extends GeoArea {
+  lat: number;
+  lng: number;
+}
+
+export type ShippingCoverage = 'all' | 'yes' | 'no';
+
+const GBA_PARTIDOS = [
+  'Almirante Brown',
+  'Avellaneda',
+  'Berazategui',
+  'Esteban Echeverría',
+  'Ezeiza',
+  'Florencio Varela',
+  'General San Martín',
+  'Hurlingham',
+  'Ituzaingó',
+  'José C. Paz',
+  'La Matanza',
+  'Lanús',
+  'Lomas de Zamora',
+  'Malvinas Argentinas',
+  'Merlo',
+  'Moreno',
+  'Morón',
+  'Quilmes',
+  'San Fernando',
+  'San Isidro',
+  'San Miguel',
+  'Tigre',
+  'Tres de Febrero',
+  'Vicente López',
+];
+
+const GBA_PARTIDO_KEYS = new Set(GBA_PARTIDOS.map(normalizeText));
+
 export function getProvinceOptions(brands: Brand[]): string[] {
   return uniqueSorted(brands.map((brand) => brand.province));
 }
@@ -64,7 +106,7 @@ function toRad(deg: number): number {
 export interface StoreTypeFilters {
   storeType: 'all' | 'online' | 'physical';
   maxDistance: number;
-  userLocation: { lat: number; lng: number } | null;
+  userLocation: UserLocation | null;
 }
 
 export function filterBrandsByStoreType(
@@ -89,6 +131,62 @@ export function filterBrandsByStoreType(
     );
     return dist <= filters.maxDistance;
   });
+}
+
+export function resolveServiceArea(values: {
+  province: string;
+  city: string;
+  userLocation: UserLocation | null;
+}): GeoArea | null {
+  if (values.province || values.city) {
+    return { province: values.province, city: values.city, partido: '' };
+  }
+  const location = values.userLocation;
+  if (location && (location.province || location.city || location.partido)) {
+    return { province: location.province, city: location.city, partido: location.partido };
+  }
+  return null;
+}
+
+export function filterBrandsByShipping(
+  brands: Brand[],
+  coverage: ShippingCoverage,
+  area: GeoArea | null
+): Brand[] {
+  if (coverage === 'all' || !area) return brands;
+  const keys = getAreaKeys(area);
+  return brands.filter((brand) => {
+    const covers =
+      brand.sendsNational ||
+      brand.shippingZones.some((zone) => keys.has(normalizeText(zone)));
+    return coverage === 'yes' ? covers : !covers;
+  });
+}
+
+function getAreaKeys(area: GeoArea): Set<string> {
+  const names = [area.province, area.city, area.partido].map(normalizeText).filter(Boolean);
+  const keys = new Set(names);
+  if (
+    names.some(
+      (name) => name === 'caba' || name === 'capital federal' || name.includes('ciudad autonoma de buenos aires')
+    )
+  ) {
+    keys.add('caba');
+  }
+  if (names.some((name) => GBA_PARTIDO_KEYS.has(name))) {
+    keys.add('gba');
+  }
+  return keys;
+}
+
+export function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function uniqueSorted(values: string[]): string[] {

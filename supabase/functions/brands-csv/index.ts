@@ -26,6 +26,8 @@ interface Brand {
   description: string;
   lat: number | null;
   lng: number | null;
+  sendsNational: boolean;
+  shippingZones: string[];
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -118,6 +120,11 @@ function mapRows(rows: Record<string, string>[]): Brand[] {
       description: getField(row, "Descripcion", "Descripción"),
       lat: parseCoord(getField(row, "Latitud", "Lat", "Latitude")),
       lng: parseCoord(getField(row, "Longitud", "Lng", "Lon", "Longitude")),
+      sendsNational: normalizeKey(getField(row, "Envia_Nacional", "Envia Nacional")) === "si",
+      shippingZones: getField(row, "Zonas_Envio", "Zonas Envio", "Zonas de Envio")
+        .split(/[,;]/)
+        .map((zone) => zone.trim())
+        .filter(Boolean),
     };
   }).filter((brand) => brand.name);
 }
