@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
-import { Check, Home, SlidersHorizontal, Truck, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { Check, Home, LocateFixed, MapPin, SlidersHorizontal, Truck, X } from 'lucide-react';
 import LocationSelects from '@/components/LocationSelects';
 
 export type SortOption = 'recent' | 'price-asc' | 'price-desc' | 'promotions';
+export type StoreType = 'all' | 'online' | 'physical';
 
 export interface FilterValues {
   category: string;
@@ -12,6 +13,9 @@ export interface FilterValues {
   city: string;
   storeOnly: boolean;
   shippingOnly: boolean;
+  storeType: StoreType;
+  maxDistance: number;
+  userLocation: { lat: number; lng: number } | null;
   minPrice: number;
   maxPrice: number;
   sort: SortOption;
@@ -25,6 +29,8 @@ export function countActiveFilters(values: FilterValues, priceMin: number, price
     Number(Boolean(values.province)) +
     Number(values.storeOnly) +
     Number(values.shippingOnly) +
+    Number(values.storeType !== 'all') +
+    Number(values.storeType === 'physical' && values.maxDistance < 50) +
     Number(values.minPrice !== priceMin || values.maxPrice !== priceMax)
   );
 }
@@ -199,21 +205,59 @@ export default function FiltersPanel({
             </p>
           </FilterSection>
 
-          <FilterSection title="Modalidad de entrega">
+          <FilterSection title="Tipo de tienda">
             <div className="flex flex-wrap gap-2">
-              <DeliveryChip
-                active={values.storeOnly}
-                onClick={() => onChange({ ...values, storeOnly: !values.storeOnly })}
-                icon={<Home className="h-3.5 w-3.5" />}
-                label="Tienda Física / Showroom"
+              <StoreTypeChip
+                active={values.storeType === 'all'}
+                onClick={() => onChange({ ...values, storeType: 'all' })}
+                label="Todos"
               />
-              <DeliveryChip
-                active={values.shippingOnly}
-                onClick={() => onChange({ ...values, shippingOnly: !values.shippingOnly })}
-                icon={<Truck className="h-3.5 w-3.5" />}
-                label="Con Envío"
+              <StoreTypeChip
+                active={values.storeType === 'online'}
+                onClick={() => onChange({ ...values, storeType: 'online' })}
+                label="Solo online"
+              />
+              <StoreTypeChip
+                active={values.storeType === 'physical'}
+                onClick={() => onChange({ ...values, storeType: 'physical' })}
+                label="Local físico / Showroom"
               />
             </div>
+
+            {values.storeType === 'physical' && (
+              <div className="mt-4 rounded-xl bg-neutral-50 p-4 ring-1 ring-neutral-100">
+                <GeoButton
+                  userLocation={values.userLocation}
+                  onLocate={(loc) => onChange({ ...values, userLocation: loc })}
+                  onClear={() => onChange({ ...values, userLocation: null })}
+                />
+                <div className="mt-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-neutral-600">
+                      Distancia máxima
+                    </label>
+                    <span className="text-xs font-bold text-emerald-600">
+                      {values.maxDistance} km
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    value={values.maxDistance}
+                    onChange={(event) =>
+                      onChange({ ...values, maxDistance: Number(event.target.value) })
+                    }
+                    className="mt-2 w-full accent-emerald-600"
+                  />
+                  <p className="mt-1 text-[11px] text-neutral-400">
+                    {values.userLocation
+                      ? 'Se filtran las marcas dentro del radio desde tu ubicación.'
+                      : 'Activá tu ubicación para filtrar por radio, o usá la ciudad manualmente.'}
+                  </p>
+                </div>
+              </div>
+            )}
           </FilterSection>
 
           <FilterSection title="Rango de precio">
@@ -329,6 +373,94 @@ function DeliveryChip({
   );
 }
 
+function StoreTypeChip({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-full px-3.5 py-2 text-xs font-semibold transition active:scale-95 ${
+        active
+          ? 'bg-neutral-900 text-white shadow-sm'
+          : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function GeoButton({
+  userLocation,
+  onLocate,
+  onClear,
+}: {
+  userLocation: { lat: number; lng: number } | null;
+  onLocate: (loc: { lat: number; lng: number }) => void;
+  onClear: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLocate = () => {
+    setLoading(true);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onLocate({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLoading(false);
+      },
+      (err) => {
+        setError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Permiso denegado. Filtrá por ciudad manualmente.'
+            : 'No pudimos obtener tu ubicación.'
+        );
+        setLoading(false);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
+  if (userLocation) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 ring-1 ring-emerald-200">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+          <MapPin className="h-3.5 w-3.5" />
+          Ubicación activa
+        </span>
+        <button
+          onClick={onClear}
+          className="text-xs font-medium text-emerald-600 underline-offset-2 hover:underline"
+        >
+          Quitar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        onClick={handleLocate}
+        disabled={loading}
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.98] disabled:opacity-60"
+      >
+        <LocateFixed className="h-3.5 w-3.5" />
+        {loading ? 'Obteniendo ubicación...' : 'Usar mi ubicación'}
+      </button>
+      {error && <p className="mt-1.5 text-[11px] text-red-500">{error}</p>}
+    </div>
+  );
+}
+
 function formatPrice(value: number): string {
-  return `$${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(value)}`;
+  return `${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(value)}`;
 }

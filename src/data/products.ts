@@ -10,6 +10,8 @@ export interface Brand {
   shipsNationwide: boolean;
   hasShipping: boolean;
   description: string;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface Product {

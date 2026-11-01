@@ -24,6 +24,8 @@ interface Brand {
   shipsNationwide: boolean;
   hasShipping: boolean;
   description: string;
+  lat: number | null;
+  lng: number | null;
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -91,6 +93,11 @@ function getField(row: Record<string, string>, ...keys: string[]): string {
   return "";
 }
 
+function parseCoord(value: string): number | null {
+  const n = parseFloat(value.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
 function mapRows(rows: Record<string, string>[]): Brand[] {
   const fallbackLogo =
     "https://images.pexels.com/photos/994523/pexels-photo-994523.jpeg?auto=compress&cs=tinysrgb&w=900";
@@ -109,6 +116,8 @@ function mapRows(rows: Record<string, string>[]): Brand[] {
       shipsNationwide: scope.includes("nacional") || scope.includes("todo el pais"),
       hasShipping: normalizeKey(getField(row, "Tiene_Envio", "Tiene Envio")) === "si",
       description: getField(row, "Descripcion", "Descripción"),
+      lat: parseCoord(getField(row, "Latitud", "Lat", "Latitude")),
+      lng: parseCoord(getField(row, "Longitud", "Lng", "Lon", "Longitude")),
     };
   }).filter((brand) => brand.name);
 }

@@ -15,6 +15,7 @@ import AboutView from '@/components/AboutView';
 import AboutFooter from '@/components/AboutFooter';
 import FavoritesView from '@/components/FavoritesView';
 import TermsModal from '@/components/TermsModal';
+import MapView from '@/components/MapView';
 import { useFavoriteProducts, useFavoriteBrands } from '@/hooks/useFavorites';
 import {
   fetchBrands,
@@ -25,6 +26,7 @@ import {
 } from '@/data/products';
 import {
   filterBrandsByLocation,
+  filterBrandsByStoreType,
   getCityOptions,
   getProvinceOptions,
 } from '@/lib/brandLocation';
@@ -53,12 +55,17 @@ export default function App() {
     city: '',
     storeOnly: false,
     shippingOnly: false,
+    storeType: 'all',
+    maxDistance: 50,
+    userLocation: null,
     minPrice: 0,
     maxPrice: 0,
     sort: DEFAULT_SORT,
   });
   const [draftFilters, setDraftFilters] = useState<FilterValues>(filters);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapSelectedBrand, setMapSelectedBrand] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = () => setTermsOpen(true);
@@ -159,6 +166,15 @@ export default function App() {
 
   const filterProducts = (values: FilterValues): Product[] => {
     const search = query.trim().toLowerCase();
+    const storeTypeBrands = values.storeType !== 'all'
+      ? new Set(
+          filterBrandsByStoreType(brands, {
+            storeType: values.storeType,
+            maxDistance: values.maxDistance,
+            userLocation: values.userLocation,
+          }).map((brand) => brand.name)
+        )
+      : null;
     const locationBrands = values.province || values.storeOnly || values.shippingOnly
       ? new Set(
           filterBrandsByLocation(brands, {
@@ -178,6 +194,7 @@ export default function App() {
       const matchesStyle =
         values.styles.length === 0 || values.styles.includes(product.style);
       const matchesLocation = !locationBrands || locationBrands.has(product.brand);
+      const matchesStoreType = !storeTypeBrands || storeTypeBrands.has(product.brand);
       const matchesPrice =
         product.price >= values.minPrice && product.price <= values.maxPrice;
       const matchesSearch =
@@ -195,6 +212,7 @@ export default function App() {
         matchesGender &&
         matchesStyle &&
         matchesLocation &&
+        matchesStoreType &&
         matchesPrice &&
         matchesSearch
       );
@@ -259,6 +277,9 @@ export default function App() {
       city: '',
       storeOnly: false,
       shippingOnly: false,
+      storeType: 'all',
+      maxDistance: 50,
+      userLocation: null,
       minPrice: priceLimits.min,
       maxPrice: priceLimits.max,
       sort: DEFAULT_SORT,
@@ -351,9 +372,26 @@ export default function App() {
             onViewProducts={handleViewProducts}
             isFavorite={isBrandFavorite}
             onToggleFavorite={toggleBrandFavorite}
+            onOpenMap={() => setMapOpen(true)}
           />
         </main>
       )}
+
+      <MapView
+        open={mapOpen}
+        brands={brands}
+        userLocation={filters.userLocation}
+        selectedBrand={mapSelectedBrand}
+        onSelectBrand={(name) => {
+          setMapOpen(false);
+          setMapSelectedBrand(null);
+          handleViewProducts(name);
+        }}
+        onClose={() => {
+          setMapOpen(false);
+          setMapSelectedBrand(null);
+        }}
+      />
 
       {view === 'favorites' && (
         <FavoritesView
