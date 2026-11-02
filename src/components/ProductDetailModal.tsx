@@ -59,6 +59,8 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
             <img
               src={image}
               alt={product.name}
+              loading="lazy"
+              decoding="async"
               onError={(event) => {
                 if (event.currentTarget.src !== FALLBACK_PRODUCT_IMAGE) {
                   event.currentTarget.src = FALLBACK_PRODUCT_IMAGE;
@@ -82,7 +84,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
                     index === imageIndex ? 'ring-emerald-500' : 'ring-transparent hover:ring-neutral-300'
                   }`}
                 >
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>

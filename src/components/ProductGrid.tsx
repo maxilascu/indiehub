@@ -1,6 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
 import { SearchX, Loader2 } from 'lucide-react';
 import type { Product } from '@/data/products';
 import ProductCard from './ProductCard';
+
+const PAGE_SIZE = 24;
 
 interface Props {
   products: Product[];
@@ -12,6 +15,29 @@ interface Props {
 }
 
 export default function ProductGrid({ products, loading, error, onSelectProduct, isFavorite, onToggleFavorite }: Props) {
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const hasMore = visibleCount < products.length;
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [products]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleCount((count) => Math.min(count + PAGE_SIZE, products.length));
+        }
+      },
+      { rootMargin: '400px 0px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, products.length]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -49,10 +75,17 @@ export default function ProductGrid({ products, loading, error, onSelectProduct,
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2 lg:grid-cols-4">
-      {products.map((p) => (
-        <ProductCard key={p.id} product={p} onOpen={onSelectProduct} isFavorite={isFavorite?.(p)} onToggleFavorite={onToggleFavorite} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2 lg:grid-cols-4">
+        {products.slice(0, visibleCount).map((p) => (
+          <ProductCard key={p.id} product={p} onOpen={onSelectProduct} isFavorite={isFavorite?.(p)} onToggleFavorite={onToggleFavorite} />
+        ))}
+      </div>
+      {hasMore && (
+        <div ref={sentinelRef} className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+        </div>
+      )}
+    </>
   );
 }

@@ -34,6 +34,7 @@ export default function ProductCard({ product, onOpen, isFavorite, onToggleFavor
             src={product.image}
             alt={product.name}
             loading="lazy"
+            decoding="async"
             onError={(e) => {
               const img = e.currentTarget;
               if (img.src !== FALLBACK_PRODUCT_IMAGE) {
