@@ -54,8 +54,8 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
         aria-labelledby="product-detail-title"
         className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-w-4xl sm:flex-row sm:rounded-3xl"
       >
-        <div className="relative bg-neutral-100 sm:w-1/2">
-          <div className="relative aspect-square overflow-hidden">
+        <div className="relative shrink-0 bg-neutral-100 sm:w-1/2">
+          <div className="relative h-[35vh] overflow-hidden sm:h-full">
             <img
               src={image}
               alt={product.name}
@@ -64,7 +64,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
                   event.currentTarget.src = FALLBACK_PRODUCT_IMAGE;
                 }
               }}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain sm:object-cover"
             />
             {product.freeShipping && (
               <FreeShippingBadge className="absolute left-3 top-3" />
@@ -89,143 +89,147 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
           )}
         </div>
 
-        <div className="flex flex-1 flex-col overflow-y-auto p-5 sm:p-7">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-600">
-              {product.brand}
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => toggle(product)}
-                aria-label={isFavorite(product) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
-                aria-pressed={isFavorite(product)}
-                className={`grid h-8 w-8 place-items-center rounded-full transition active:scale-90 ${
-                  isFavorite(product) ? 'text-red-500' : 'text-neutral-400 hover:text-red-500'
-                }`}
-              >
-                <Heart className="h-4 w-4" fill={isFavorite(product) ? 'currentColor' : 'none'} />
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Cerrar detalle"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <h2 id="product-detail-title" className="mt-2 text-xl font-bold leading-tight text-neutral-900 sm:text-2xl">
-            {product.name}
-          </h2>
-
-          <div className="mt-3 flex flex-wrap items-baseline gap-2">
-            <span className="text-2xl font-bold tracking-tight text-neutral-900">
-              {formatARS(product.price)}
-            </span>
-            {hasPreviousPrice && product.previousPrice && (
-              <span className="text-sm font-medium text-neutral-400 line-through">
-                {formatARS(product.previousPrice)}
-              </span>
-            )}
-          </div>
-
-          {chips.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {chips.map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold text-neutral-600"
-                >
-                  {chip}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {product.sizes.length > 0 && (
-            <div className="mt-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-400">
-                Talles disponibles
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 overflow-y-auto p-5 [scrollbar-width:none] sm:p-7 [&::-webkit-scrollbar]:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-600">
+                {product.brand}
               </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {product.sizes.map((size) => (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => toggle(product)}
+                  aria-label={isFavorite(product) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+                  aria-pressed={isFavorite(product)}
+                  className={`grid h-8 w-8 place-items-center rounded-full transition active:scale-90 ${
+                    isFavorite(product) ? 'text-red-500' : 'text-neutral-400 hover:text-red-500'
+                  }`}
+                >
+                  <Heart className="h-4 w-4" fill={isFavorite(product) ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Cerrar detalle"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <h2 id="product-detail-title" className="mt-2 text-xl font-bold leading-tight text-neutral-900 sm:text-2xl">
+              {product.name}
+            </h2>
+
+            <div className="mt-3 flex flex-wrap items-baseline gap-2">
+              <span className="text-2xl font-bold tracking-tight text-neutral-900">
+                {formatARS(product.price)}
+              </span>
+              {hasPreviousPrice && product.previousPrice && (
+                <span className="text-sm font-medium text-neutral-400 line-through">
+                  {formatARS(product.previousPrice)}
+                </span>
+              )}
+            </div>
+
+            {chips.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {chips.map((chip) => (
                   <span
-                    key={size}
-                    className="grid min-w-10 place-items-center rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-neutral-800"
+                    key={chip}
+                    className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold text-neutral-600"
                   >
-                    {size}
+                    {chip}
                   </span>
                 ))}
               </div>
-              <SizeGuide key={product.id} />
-            </div>
-          )}
+            )}
 
-          {product.promotion && (
-            <span className="mt-3 inline-flex w-fit rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">
-              {product.promotion}
-            </span>
-          )}
-
-          {brand && (locationParts.length > 0 || deliveryInfo.length > 0) && (
-            <div className="mt-4 flex flex-col gap-1 rounded-xl bg-neutral-50 px-3.5 py-2.5 ring-1 ring-neutral-100">
-              {locationParts.length > 0 && (
-                <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-600">
-                  <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                  {locationParts.join(', ')}
+            {product.sizes.length > 0 && (
+              <div className="mt-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-400">
+                  Talles disponibles
                 </p>
-              )}
-              {deliveryInfo.length > 0 && (
-                <div className="flex flex-wrap gap-3">
-                  {brand.hasStore && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-neutral-500">
-                      <Home className="h-3 w-3" />
-                      Showroom
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {product.sizes.map((size) => (
+                    <span
+                      key={size}
+                      className="grid min-w-10 place-items-center rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-neutral-800"
+                    >
+                      {size}
                     </span>
-                  )}
-                  {brand.sendsNational && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-sky-600">
-                      <Truck className="h-3 w-3" />
-                      Envíos a todo el país
-                    </span>
-                  )}
+                  ))}
                 </div>
-              )}
+                <SizeGuide key={product.id} />
+              </div>
+            )}
+
+            {product.promotion && (
+              <span className="mt-3 inline-flex w-fit rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">
+                {product.promotion}
+              </span>
+            )}
+
+            {brand && (locationParts.length > 0 || deliveryInfo.length > 0) && (
+              <div className="mt-4 flex flex-col gap-1 rounded-xl bg-neutral-50 px-3.5 py-2.5 ring-1 ring-neutral-100">
+                {locationParts.length > 0 && (
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-600">
+                    <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                    {locationParts.join(', ')}
+                  </p>
+                )}
+                {deliveryInfo.length > 0 && (
+                  <div className="flex flex-wrap gap-3">
+                    {brand.hasStore && (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-neutral-500">
+                        <Home className="h-3 w-3" />
+                        Showroom
+                      </span>
+                    )}
+                    {brand.sendsNational && (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-sky-600">
+                        <Truck className="h-3 w-3" />
+                        Envíos a todo el país
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {product.description && (
+              <p className="mt-4 text-sm leading-6 text-neutral-600">{product.description}</p>
+            )}
+            {!product.description && brand?.description && (
+              <p className="mt-4 text-sm leading-6 text-neutral-600">{brand.description}</p>
+            )}
+          </div>
+
+          <div className="sticky bottom-0 z-10 border-t border-neutral-100 bg-white p-4 sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-7 sm:pb-7">
+            <div className="flex flex-col gap-2.5 sm:flex-row">
+              <a
+                href={storeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackOutboundClick(product.brand, storeUrl, 'ecommerce')}
+                className="flex flex-[1.6] items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 active:scale-[0.98]"
+              >
+                Ver en la tienda
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onViewBrand(product.brand);
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neutral-100 py-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-200 active:scale-[0.98]"
+              >
+                <Store className="h-4 w-4" />
+                Ver más de {product.brand}
+              </button>
             </div>
-          )}
-
-          {product.description && (
-            <p className="mt-4 text-sm leading-6 text-neutral-600">{product.description}</p>
-          )}
-          {!product.description && brand?.description && (
-            <p className="mt-4 text-sm leading-6 text-neutral-600">{brand.description}</p>
-          )}
-
-          <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
-            <a
-              href={storeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => trackOutboundClick(product.brand, storeUrl, 'ecommerce')}
-              className="flex flex-[1.6] items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 active:scale-[0.98]"
-            >
-              Ver en la tienda
-              <ArrowUpRight className="h-4 w-4" />
-            </a>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onViewBrand(product.brand);
-              }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neutral-100 py-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-200 active:scale-[0.98]"
-            >
-              <Store className="h-4 w-4" />
-              Ver más de {product.brand}
-            </button>
           </div>
         </div>
       </div>
