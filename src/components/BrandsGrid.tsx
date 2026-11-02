@@ -3,7 +3,7 @@ import { ArrowUpRight, Home, MapPin, ShoppingBag, Truck } from 'lucide-react';
 import BrandLocationFilter from '@/components/BrandLocationFilter';
 import FavoriteButton from '@/components/FavoriteButton';
 import type { Brand } from '@/data/products';
-import { trackOutboundClick } from '@/lib/analytics';
+import { trackOutgoingClick } from '@/lib/analytics';
 import {
   EMPTY_BRAND_LOCATION_FILTERS,
   filterBrandsByLocation,
@@ -165,7 +165,7 @@ export default function BrandsGrid({
                       href={brand.instagram}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={() => trackOutboundClick(brand.name, brand.instagram, 'instagram')}
+                      onClick={() => trackOutgoingClick(brand.name, 'instagram')}
                       className="flex items-center justify-center gap-1.5 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-200 hover:text-neutral-900"
                     >
                       <ArrowUpRight className="h-3.5 w-3.5" />

@@ -4,7 +4,7 @@ import FreeShippingBadge from '@/components/FreeShippingBadge';
 import SizeGuide from '@/components/SizeGuide';
 import { useFavoriteProducts } from '@/hooks/useFavorites';
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Brand, type Product } from '@/data/products';
-import { trackOutboundClick } from '@/lib/analytics';
+import { trackOutgoingClick } from '@/lib/analytics';
 
 interface Props {
   product: Product | null;
@@ -212,7 +212,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
                 href={storeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => trackOutboundClick(product.brand, storeUrl, 'ecommerce')}
+                onClick={() => trackOutgoingClick(product.brand, 'ecommerce')}
                 className="flex flex-[1.6] items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 active:scale-[0.98]"
               >
                 Ver en la tienda

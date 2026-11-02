@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Flame, ChevronLeft, ChevronRight, ArrowUpRight } from 'lucide-react';
 import { FALLBACK_PRODUCT_IMAGE, formatARS, type Product } from '@/data/products';
-import { trackOutboundClick } from '@/lib/analytics';
+import { trackOutgoingClick } from '@/lib/analytics';
 
 interface Props {
   products: Product[];
@@ -109,7 +109,7 @@ export default function PromotionsBanner({ products, loading, onSelectProduct }:
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Ver ${p.name} en la tienda`}
-              onClick={() => trackOutboundClick(p.brand, p.link, 'ecommerce')}
+              onClick={() => trackOutgoingClick(p.brand, 'ecommerce')}
               className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-neutral-500 shadow-sm backdrop-blur transition hover:bg-neutral-900 hover:text-white"
             >
               <ArrowUpRight className="h-3.5 w-3.5" />

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Compass, MousePointerClick, Sparkles, X, Zap } from 'lucide-react';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
-import { trackOutboundClick } from '@/lib/analytics';
+import { trackOutgoingClick } from '@/lib/analytics';
 import { WHATSAPP_URL } from '@/lib/contact';
 
 interface Props {
@@ -102,7 +102,7 @@ export default function JoinBrandModal({ open, onClose }: Props) {
           href={WHATSAPP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => trackOutboundClick('IndieHub', WHATSAPP_URL, 'whatsapp')}
+          onClick={() => trackOutgoingClick('IndieHub', 'whatsapp')}
           className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 active:scale-[0.98]"
         >
           <WhatsAppIcon />

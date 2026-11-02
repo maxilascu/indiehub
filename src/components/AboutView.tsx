@@ -1,7 +1,7 @@
 import { Store, Compass, Layers, ArrowRight, Sparkles } from 'lucide-react';
 import FaqAccordion from '@/components/FaqAccordion';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
-import { trackOutboundClick } from '@/lib/analytics';
+import { trackOutgoingClick } from '@/lib/analytics';
 import { WHATSAPP_URL } from '@/lib/contact';
 
 const valueProps = [
@@ -99,7 +99,7 @@ export default function AboutView() {
             href={WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => trackOutboundClick('IndieHub', WHATSAPP_URL, 'whatsapp')}
+            onClick={() => trackOutgoingClick('IndieHub', 'whatsapp')}
             className="flex shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-emerald-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500 active:scale-[0.98]"
           >
             <WhatsAppIcon />
