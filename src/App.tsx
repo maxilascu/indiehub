@@ -313,7 +313,7 @@ export default function App() {
         <>
           <Hero query={query} onQueryChange={setQuery} />
 
-          <main className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
+          <main className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
             <div id="promotions-banner" className="mt-2 scroll-mt-20">
               <PromotionsBanner
                 products={promoProducts}
@@ -372,7 +372,7 @@ export default function App() {
       )}
 
       {view === 'brands' && (
-        <main className="mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6 lg:px-8">
+        <main className="mx-auto max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-8">
           <BrandsGrid
             brands={brands}
             loading={brandsLoading}

@@ -83,7 +83,7 @@ export default function Header({
           </button>
           <button
             onClick={() => setJoinOpen(true)}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 active:scale-[0.98] sm:px-5"
+            className="hidden rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 active:scale-[0.98] sm:inline-flex sm:px-5"
           >
             Sumá tu marca gratis
           </button>

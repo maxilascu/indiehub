@@ -49,7 +49,7 @@ export default function ProductGrid({ products, loading, error, onSelectProduct,
   }
 
   return (
-    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2 lg:grid-cols-4">
       {products.map((p) => (
         <ProductCard key={p.id} product={p} onOpen={onSelectProduct} isFavorite={isFavorite?.(p)} onToggleFavorite={onToggleFavorite} />
       ))}
