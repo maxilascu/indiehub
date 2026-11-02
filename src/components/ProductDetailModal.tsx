@@ -55,7 +55,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
         className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-w-4xl sm:flex-row sm:rounded-3xl"
       >
         <div className="relative shrink-0 bg-neutral-100 sm:w-1/2">
-          <div className="relative h-[35vh] overflow-hidden sm:h-full">
+          <div className="relative aspect-[3/4] max-h-[40vh] overflow-hidden sm:aspect-auto sm:h-full sm:max-h-none">
             <img
               src={image}
               alt={product.name}
@@ -66,7 +66,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
                   event.currentTarget.src = FALLBACK_PRODUCT_IMAGE;
                 }
               }}
-              className="h-full w-full object-contain sm:object-cover"
+              className="h-full w-full object-cover object-center"
             />
             {product.freeShipping && (
               <FreeShippingBadge className="absolute left-3 top-3" />

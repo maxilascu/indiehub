@@ -29,7 +29,7 @@ export default function ProductCard({ product, onOpen, isFavorite, onToggleFavor
         aria-label={`Ver detalles de ${product.name}`}
         className="flex flex-1 flex-col text-left"
       >
-        <span className="relative block h-32 overflow-hidden bg-neutral-100 sm:h-40">
+        <span className="relative block aspect-[3/4] overflow-hidden bg-neutral-100">
           <img
             src={product.image}
             alt={product.name}
@@ -41,7 +41,7 @@ export default function ProductCard({ product, onOpen, isFavorite, onToggleFavor
                 img.src = FALLBACK_PRODUCT_IMAGE;
               }
             }}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-105"
           />
           {product.freeShipping && (
             <FreeShippingBadge className="absolute left-1.5 top-1.5" />
