@@ -39,7 +39,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
   const locationParts = [brand?.city, brand?.province].filter(Boolean);
   const deliveryInfo: string[] = [];
   if (brand?.hasStore) deliveryInfo.push('Tiene Showroom');
-  if (brand?.shipsNationwide) deliveryInfo.push('Envíos a todo el país');
+  if (brand?.sendsNational) deliveryInfo.push('Envíos a todo el país');
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-6">
@@ -186,7 +186,7 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
                       Showroom
                     </span>
                   )}
-                  {brand.shipsNationwide && (
+                  {brand.sendsNational && (
                     <span className="flex items-center gap-1 text-[11px] font-semibold text-sky-600">
                       <Truck className="h-3 w-3" />
                       Envíos a todo el país

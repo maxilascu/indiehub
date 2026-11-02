@@ -75,12 +75,11 @@ export function filterBrandsByLocation(
     if (filters.storeOnly && !brand.hasStore) return false;
     if (filters.shippingOnly && !brand.hasShipping) return false;
     if (!filters.province) return true;
-
-    const hasLocalInPlace =
+    return (
       brand.hasStore &&
       brand.province === filters.province &&
-      (!filters.city || brand.city === filters.city);
-    return hasLocalInPlace || brand.shipsNationwide;
+      (!filters.city || brand.city === filters.city)
+    );
   });
 }
 

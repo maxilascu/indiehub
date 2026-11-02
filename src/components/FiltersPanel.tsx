@@ -17,8 +17,6 @@ export interface FilterValues {
   styles: string[];
   province: string;
   city: string;
-  storeOnly: boolean;
-  shippingOnly: boolean;
   storeType: StoreType;
   maxDistance: number;
   shippingCoverage: ShippingCoverage;
@@ -39,9 +37,7 @@ export function countActiveFilters(values: FilterValues, priceMin: number, price
     Number(values.category !== 'Todos') +
     Number(values.gender !== 'Todos') +
     Number(values.styles.length > 0) +
-    Number(Boolean(values.province)) +
-    Number(values.storeOnly) +
-    Number(values.shippingOnly) +
+    Number(values.province !== '') +
     Number(values.storeType !== 'all') +
     Number(values.storeType === 'physical' && values.maxDistance < 50) +
     Number(values.shippingCoverage !== 'all' && resolveServiceArea(values) !== null) +
@@ -223,7 +219,7 @@ export default function FiltersPanel({
               onChange={(location) => onChange({ ...values, ...location })}
             />
             <p className="mt-2 text-[11px] text-neutral-400">
-              Incluye marcas con local en la zona y marcas que envían a todo el país.
+              Muestra solo las marcas con local en la zona elegida.
             </p>
           </FilterSection>
 

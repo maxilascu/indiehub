@@ -21,7 +21,6 @@ interface Brand {
   city: string;
   hasStore: boolean;
   address: string;
-  shipsNationwide: boolean;
   hasShipping: boolean;
   description: string;
   lat: number | null;
@@ -105,7 +104,6 @@ function mapRows(rows: Record<string, string>[]): Brand[] {
     "https://images.pexels.com/photos/994523/pexels-photo-994523.jpeg?auto=compress&cs=tinysrgb&w=900";
 
   return rows.map((row, index) => {
-    const scope = normalizeKey(getField(row, "Alcance_Envios", "Alcance Envios"));
     return {
       id: index + 1,
       name: getField(row, "Marca"),
@@ -115,7 +113,6 @@ function mapRows(rows: Record<string, string>[]): Brand[] {
       city: getField(row, "Ciudad"),
       hasStore: normalizeKey(getField(row, "Tiene_Local", "Tiene Local")) === "si",
       address: getField(row, "Direccion", "Dirección"),
-      shipsNationwide: scope.includes("nacional") || scope.includes("todo el pais"),
       hasShipping: normalizeKey(getField(row, "Tiene_Envio", "Tiene Envio")) === "si",
       description: getField(row, "Descripcion", "Descripción"),
       lat: parseCoord(getField(row, "Latitud", "Lat", "Latitude")),

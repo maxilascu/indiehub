@@ -7,7 +7,6 @@ export interface Brand {
   city: string;
   hasStore: boolean;
   address: string;
-  shipsNationwide: boolean;
   hasShipping: boolean;
   description: string;
   lat: number | null;

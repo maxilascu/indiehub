@@ -24,6 +24,7 @@ import {
   type Brand,
 } from '@/data/products';
 import {
+  EMPTY_BRAND_LOCATION_FILTERS,
   filterBrandsByLocation,
   filterBrandsByShipping,
   filterBrandsByStoreType,
@@ -54,8 +55,6 @@ export default function App() {
     styles: [],
     province: '',
     city: '',
-    storeOnly: false,
-    shippingOnly: false,
     storeType: 'all',
     maxDistance: 50,
     shippingCoverage: 'all',
@@ -184,13 +183,12 @@ export default function App() {
           ).map((brand) => brand.name)
         )
       : null;
-    const locationBrands = values.province || values.storeOnly || values.shippingOnly
+    const locationBrands = values.province
       ? new Set(
           filterBrandsByLocation(brands, {
+            ...EMPTY_BRAND_LOCATION_FILTERS,
             province: values.province,
             city: values.city,
-            storeOnly: values.storeOnly,
-            shippingOnly: values.shippingOnly,
           }).map((brand) => brand.name)
         )
       : null;
@@ -286,8 +284,6 @@ export default function App() {
       styles: [],
       province: '',
       city: '',
-      storeOnly: false,
-      shippingOnly: false,
       storeType: 'all',
       maxDistance: 50,
       shippingCoverage: 'all',
