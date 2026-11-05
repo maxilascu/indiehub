@@ -11,7 +11,7 @@ const TABLE = "product_images";
 
 interface UploadResult {
   filename: string;
-  articleCode: string;
+  articleCode: string | null;
   storagePath: string;
   pageNumber: number | null;
   columnNumber: number | null;
@@ -20,22 +20,24 @@ interface UploadResult {
   publicUrl?: string;
 }
 
+function baseName(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
 function parseArticleCode(filename: string): {
-  articleCode: string;
+  articleCode: string | null;
   pageNumber: number | null;
   columnNumber: number | null;
 } {
-  const base = filename.replace(/\.[^.]+$/, "");
-  const match = base.match(/^(ART_\d+(?:_\d+)?)(?:_P(\d+))?(?:_C(\d+))?$/i);
-  if (match) {
-    return {
-      articleCode: match[1].toUpperCase(),
-      pageNumber: match[2] ? parseInt(match[2], 10) : null,
-      columnNumber: match[3] ? parseInt(match[3], 10) : null,
-    };
-  }
-  const fallback = base.split(/[_-]/).slice(0, 3).join("_");
-  return { articleCode: fallback.toUpperCase(), pageNumber: null, columnNumber: null };
+  const base = baseName(filename).replace(/\.[^.]+$/, "");
+  const code = base.match(/^(ART_\d+(?:\.\d+)?)/i);
+  const page = base.match(/_P(\d+)/i);
+  const column = base.match(/_C(\d+)/i);
+  return {
+    articleCode: code ? code[1].toUpperCase() : null,
+    pageNumber: page ? parseInt(page[1], 10) : null,
+    columnNumber: column ? parseInt(column[1], 10) : null,
+  };
 }
 
 function timingSafeCompare(a: string, b: string): boolean {
@@ -106,10 +108,10 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const filename = file.name;
+  const filename = baseName(file.name);
   const result: UploadResult = {
     filename,
-    articleCode: "",
+    articleCode: null,
     storagePath: "",
     pageNumber: null,
     columnNumber: null,
@@ -176,21 +178,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: countData, error: countError } = await supabase
-      .from(TABLE)
-      .select("id", { count: "exact", head: true })
-      .eq("article_code", articleCode);
+    let displayOrder = 0;
+    if (articleCode) {
+      const { count, error: countError } = await supabase
+        .from(TABLE)
+        .select("id", { count: "exact", head: true })
+        .eq("article_code", articleCode);
 
-    if (countError) {
-      const { error: rmError } = await supabase.storage.from(BUCKET_ID).remove([filename]);
-      result.error = `Error al contar imágenes existentes: ${countError.message}${rmError ? ` (cleanup: ${rmError.message})` : ""}`;
-      return new Response(
-        JSON.stringify({ result }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (countError) {
+        const { error: rmError } = await supabase.storage.from(BUCKET_ID).remove([filename]);
+        result.error = `Error al contar imágenes existentes: ${countError.message}${rmError ? ` (cleanup: ${rmError.message})` : ""}`;
+        return new Response(
+          JSON.stringify({ result }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      displayOrder = count ?? 0;
     }
-
-    const currentCount = (countData as unknown[] | null)?.length ?? 0;
 
     const { error: dbError } = await supabase.from(TABLE).insert({
       article_code: articleCode,
@@ -198,7 +202,7 @@ Deno.serve(async (req: Request) => {
       storage_path: filename,
       page_number: pageNumber,
       column_number: columnNumber,
-      display_order: currentCount,
+      display_order: displayOrder,
     });
 
     if (dbError) {

@@ -16,7 +16,7 @@ interface FileItem {
   id: string;
   file: File;
   previewUrl: string;
-  articleCode: string;
+  articleCode: string | null;
   pageNumber: number | null;
   columnNumber: number | null;
   status: 'pending' | 'uploading' | 'uploaded' | 'skipped' | 'error';
@@ -27,7 +27,7 @@ interface FileItem {
 interface SingleUploadResult {
   result: {
     filename: string;
-    articleCode: string;
+    articleCode: string | null;
     storagePath: string;
     pageNumber: number | null;
     columnNumber: number | null;
@@ -38,20 +38,19 @@ interface SingleUploadResult {
 }
 
 function parseArticleCode(filename: string): {
-  articleCode: string;
+  articleCode: string | null;
   pageNumber: number | null;
   columnNumber: number | null;
 } {
-  const base = filename.replace(/\.[^.]+$/, '');
-  const match = base.match(/^(ART_\d+(?:_\d+)?)(?:_P(\d+))?(?:_C(\d+))?$/i);
-  if (match) {
-    return {
-      articleCode: match[1].toUpperCase(),
-      pageNumber: match[2] ? parseInt(match[2], 10) : null,
-      columnNumber: match[3] ? parseInt(match[3], 10) : null,
-    };
-  }
-  return { articleCode: base.toUpperCase(), pageNumber: null, columnNumber: null };
+  const base = (filename.split(/[\\/]/).pop() ?? filename).replace(/\.[^.]+$/, '');
+  const code = base.match(/^(ART_\d+(?:\.\d+)?)/i);
+  const page = base.match(/_P(\d+)/i);
+  const column = base.match(/_C(\d+)/i);
+  return {
+    articleCode: code ? code[1].toUpperCase() : null,
+    pageNumber: page ? parseInt(page[1], 10) : null,
+    columnNumber: column ? parseInt(column[1], 10) : null,
+  };
 }
 
 export default function AdminImages() {
@@ -507,7 +506,7 @@ export default function AdminImages() {
                       {item.file.name}
                     </p>
                     <p className="mt-0.5 text-[10px] text-neutral-500">
-                      {item.articleCode}
+                      {item.articleCode ?? 'Pendiente de asociación'}
                       {item.pageNumber !== null && ` · Pág ${item.pageNumber}`}
                       {item.columnNumber !== null && ` · Col ${item.columnNumber}`}
                     </p>
