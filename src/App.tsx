@@ -237,7 +237,7 @@ export default function App() {
       if (values.sort === 'promotions') {
         return Number(Boolean(b.promotion)) - Number(Boolean(a.promotion));
       }
-      return b.id - a.id;
+      return b.catalogSeq - a.catalogSeq;
     });
   };
 
