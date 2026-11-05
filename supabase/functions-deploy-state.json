@@ -3,11 +3,11 @@
   "functions": {
     "brands-csv": {
       "hasChanged": false,
-      "hash": "567a311072c07ae048fea706588ddba5ea9572e9be3540ff3a3dcb096329bd88"
+      "hash": "9bacda13c9dd98a7b4d70df7eebdc29210921db74036adec43acfc4c04e9ed8b"
     },
     "products-csv": {
       "hasChanged": false,
-      "hash": "4ac39e5949792a1e28d1734df394cd5f2cc9727909384f86400928cfcf627846"
+      "hash": "a94b8445712950afac7f7326bdb6f5c170bfc1ac74f4501c3b6bbd5aa518a79b"
     },
     "upload-product-images": {
       "hasChanged": false,

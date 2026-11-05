@@ -20,6 +20,15 @@ export interface Product {
   brand: string;
   name: string;
   price: number;
+  priceLabel: string;
+  priceDozen: number | null;
+  pricePack: number | null;
+  unitsPack: number | null;
+  priceSingle: number | null;
+  unitPriceSingle: string;
+  codigoDocena: string;
+  codigoPack: string;
+  imageCodes: string[];
   image: string;
   link: string;
   gender: string;
@@ -45,10 +54,22 @@ export function formatARS(value: number): string {
   }).format(value);
 }
 
-type EdgeProduct = Omit<Product, 'images' | 'description' | 'sizes'> & {
+type EdgeProduct = Omit<
+  Product,
+  'images' | 'description' | 'sizes' | 'priceLabel' | 'priceDozen' | 'pricePack' | 'unitsPack' | 'priceSingle' | 'unitPriceSingle' | 'codigoDocena' | 'codigoPack' | 'imageCodes'
+> & {
   images?: string[];
   description?: string;
   sizes?: string[];
+  priceLabel?: string;
+  priceDozen?: number | null;
+  pricePack?: number | null;
+  unitsPack?: number | null;
+  priceSingle?: number | null;
+  unitPriceSingle?: string;
+  codigoDocena?: string;
+  codigoPack?: string;
+  imageCodes?: string[];
 };
 
 interface EdgeFunctionResponse {
@@ -89,11 +110,6 @@ export function normalizeArticleCode(value: string): string | null {
   const match = value.match(/(\d+)(?:\.(\d+))?/);
   if (!match) return null;
   return `ART_${parseInt(match[1], 10)}${match[2] ? `.${match[2]}` : ''}`;
-}
-
-export function extractArticleCode(productName: string): string | null {
-  const match = productName.match(/\bArt\.?\s*(\d+(?:\.\d+)?)/i);
-  return match ? normalizeArticleCode(match[1]) : null;
 }
 
 function buildProductImageUrl(storagePath: string): string {
@@ -156,12 +172,23 @@ export async function fetchProducts(): Promise<Product[]> {
   }
 
   return json.products.map((product) => {
-    const articleCode = extractArticleCode(product.name);
-    const photos = (articleCode && photosByArticle.get(articleCode)) || [];
+    const codes = (product.imageCodes ?? [])
+      .map(normalizeArticleCode)
+      .filter((c): c is string => c !== null);
+    const photos = [...new Set(codes.flatMap((code) => photosByArticle.get(code) ?? []))];
     return {
       ...product,
       description: product.description ?? '',
       sizes: product.sizes ?? [],
+      priceLabel: product.priceLabel ?? '',
+      priceDozen: product.priceDozen ?? null,
+      pricePack: product.pricePack ?? null,
+      unitsPack: product.unitsPack ?? null,
+      priceSingle: product.priceSingle ?? null,
+      unitPriceSingle: product.unitPriceSingle ?? '',
+      codigoDocena: product.codigoDocena ?? '',
+      codigoPack: product.codigoPack ?? '',
+      imageCodes: product.imageCodes ?? [],
       image: photos[0] ?? FALLBACK_PRODUCT_IMAGE,
       images: photos.length ? photos : [FALLBACK_PRODUCT_IMAGE],
     };

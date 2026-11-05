@@ -124,14 +124,33 @@ export default function ProductDetailModal({ product, brands, onClose, onViewBra
               {product.name}
             </h2>
 
-            <div className="mt-3 flex flex-wrap items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-neutral-900">
-                {formatARS(product.price)}
-              </span>
-              {hasPreviousPrice && product.previousPrice && (
-                <span className="text-sm font-medium text-neutral-400 line-through">
-                  {formatARS(product.previousPrice)}
-                </span>
+            <div className="mt-3 space-y-1">
+              {product.price > 0 ? (
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-2xl font-bold tracking-tight text-neutral-900">
+                    {formatARS(product.price)}
+                  </span>
+                  {product.priceLabel && (
+                    <span className="text-sm font-medium text-neutral-500">{product.priceLabel}</span>
+                  )}
+                  {hasPreviousPrice && product.previousPrice && (
+                    <span className="text-sm font-medium text-neutral-400 line-through">
+                      {formatARS(product.previousPrice)}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-lg font-bold text-neutral-900">Consultar precio</span>
+              )}
+              {product.priceDozen !== null && product.priceDozen !== product.price && (
+                <p className="text-sm text-neutral-600">
+                  Docena x12: <span className="font-semibold">{formatARS(product.priceDozen)}</span>
+                </p>
+              )}
+              {product.pricePack !== null && product.pricePack !== product.price && (
+                <p className="text-sm text-neutral-600">
+                  Pack{product.unitsPack ? ` x${product.unitsPack}` : ''}: <span className="font-semibold">{formatARS(product.pricePack)}</span>
+                </p>
               )}
             </div>
 

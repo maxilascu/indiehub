@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const SHEETS_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vR97zMe92tmYcr1A_KfEVQoxgUID3CBIVPzPknJ3DCIUO3Ov0BxYBza_pPPCqzDNHuNM0BtwCV6bPkl/pub?output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXnzu-bUmg_mKSUlnSfEpKeixRDOXOx_ck9QaRoEZbqP56n13OEGPvM5U4fiNU0g/pub?gid=1980249531&single=true&output=csv";
 
 const CACHE_TTL_SECONDS = 60;
 const CACHE_TABLE = "csv_cache";
@@ -24,11 +24,21 @@ interface Product {
   brand: string;
   name: string;
   price: number;
+  priceLabel: string;
+  priceDozen: number | null;
+  pricePack: number | null;
+  unitsPack: number | null;
+  priceSingle: number | null;
+  unitPriceSingle: string;
+  codigoDocena: string;
+  codigoPack: string;
+  imageCodes: string[];
   image: string;
   link: string;
   gender: string;
   category: string;
   style: string;
+  location: string;
   promotion: string;
   freeShipping: boolean;
   previousPrice: number | null;
@@ -147,54 +157,64 @@ function parseSizes(raw: string): string[] {
     .filter((size) => size !== "");
 }
 
+function parsePrice(raw: string): number | null {
+  if (!raw.trim()) return null;
+  const num = parseInt(raw.replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
+
 function mapRows(rows: Record<string, string>[]): Product[] {
   const FALLBACK_IMAGE =
     "https://images.pexels.com/photos/8146450/pexels-photo-8146450.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
 
   return rows
-    .map((row, idx) => {
+    .map((row) => {
       const brand = getField(row, "Marca");
       const name = getField(row, "Nombre");
       if (!brand && !name) return null;
 
-      const priceRaw = getField(row, "Precio") || "0";
-      const price = parseInt(priceRaw.replace(/[^\d]/g, ""), 10) || 0;
-
-      const image = getField(row, "Imagen", "Imagen_URL") || FALLBACK_IMAGE;
-      const extraImages = [
-        getField(row, "Imagen_2", "Imagen 2"),
-        getField(row, "Imagen_3", "Imagen 3"),
-        getField(row, "Imagen_4", "Imagen 4"),
-      ].filter((url) => url !== "");
-      const description = getField(row, "Descripcion", "Descripción");
+      const id = parseInt(getField(row, "id"), 10) || 0;
+      const price = parsePrice(getField(row, "PrecioPrincipal")) ?? 0;
+      const priceLabel = getField(row, "UnidadPrecioPrincipal");
+      const priceDozen = parsePrice(getField(row, "PrecioDocena"));
+      const pricePack = parsePrice(getField(row, "PrecioPack"));
+      const unitsPack = parseInt(getField(row, "UnidadesPack"), 10) || null;
+      const priceSingle = parsePrice(getField(row, "PrecioUnico"));
+      const unitPriceSingle = getField(row, "UnidadPrecioUnico");
+      const codigoDocena = getField(row, "CodigoDocena");
+      const codigoPack = getField(row, "CodigoPack");
+      const imageCodes = getField(row, "CodigosImagen")
+        .split(";")
+        .map((c) => c.trim())
+        .filter(Boolean);
+      const description = getField(row, "DescripcionTarifario", "Descripcion", "Descripción");
       const sizes = parseSizes(getField(row, "Talles"));
-      const link = getField(row, "URL", "Link_Tienda") || "#";
+      const link = getField(row, "Link", "URL", "Link_Tienda") || "#";
       const gender = getField(row, "Genero", "Género") || "Unisex";
       const category = getField(row, "TipoPrenda", "Prenda");
       const style = getField(row, "Estilo");
       const location = getField(row, "Ubicacion", "Ubicación");
       const rawPromotion = getField(row, "Promocion", "Promoción").trim();
       const promotion = FREE_SHIPPING_TEXT.test(normalizeKey(rawPromotion)) ? "" : rawPromotion;
-      const freeShipping = normalizeKey(getField(row, "Envio_Gratis", "Envio Gratis")) === "si";
-      const previousPriceRaw = getField(
-        row,
-        "Precio Anterior",
-        "Precio_Anterior",
-        "PrecioAnterior",
-        "Precio Original",
-        "PrecioOriginal"
-      );
-      const previousPrice = previousPriceRaw
-        ? parseInt(previousPriceRaw.replace(/[^\d]/g, ""), 10) || null
-        : null;
+      const freeShipping = normalizeKey(getField(row, "EnvioGratis", "Envio_Gratis", "Envio Gratis")) === "si";
+      const previousPrice = parsePrice(getField(row, "PrecioAnterior", "Precio Anterior", "Precio_Anterior"));
 
       return {
-        id: idx + 1,
+        id,
         brand,
         name,
         price,
-        image,
-        images: [image, ...extraImages],
+        priceLabel,
+        priceDozen,
+        pricePack,
+        unitsPack,
+        priceSingle,
+        unitPriceSingle,
+        codigoDocena,
+        codigoPack,
+        imageCodes,
+        image: FALLBACK_IMAGE,
+        images: [FALLBACK_IMAGE],
         description,
         link,
         gender: gender || "Unisex",

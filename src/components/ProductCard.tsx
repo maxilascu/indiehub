@@ -62,13 +62,22 @@ export default function ProductCard({ product, onOpen, isFavorite, onToggleFavor
             {product.name}
           </span>
           <span className="mt-1 flex flex-wrap items-baseline gap-1">
-            <span className="text-[11px] font-bold tracking-tight text-neutral-900">
-              {formatARS(product.price)}
-            </span>
-            {hasPreviousPrice && product.previousPrice && (
-              <span className="text-[8px] font-medium text-neutral-400 line-through">
-                {formatARS(product.previousPrice)}
-              </span>
+            {product.price > 0 ? (
+              <>
+                <span className="text-[11px] font-bold tracking-tight text-neutral-900">
+                  {formatARS(product.price)}
+                </span>
+                {product.priceLabel && (
+                  <span className="text-[8px] font-medium text-neutral-500">{product.priceLabel}</span>
+                )}
+                {hasPreviousPrice && product.previousPrice && (
+                  <span className="text-[8px] font-medium text-neutral-400 line-through">
+                    {formatARS(product.previousPrice)}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-[10px] font-bold text-neutral-700">Consultar precio</span>
             )}
           </span>
         </span>

@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const BRANDS_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vR97zMe92tmYcr1A_KfEVQoxgUID3CBIVPzPknJ3DCIUO3Ov0BxYBza_pPPCqzDNHuNM0BtwCV6bPkl/pub?gid=305510317&single=true&output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXnzu-bUmg_mKSUlnSfEpKeixRDOXOx_ck9QaRoEZbqP56n13OEGPvM5U4fiNU0g/pub?gid=151935244&single=true&output=csv";
 const CACHE_TABLE = "csv_cache";
 const CACHE_KEY = "brands";
 const CACHE_TTL_SECONDS = 60;
