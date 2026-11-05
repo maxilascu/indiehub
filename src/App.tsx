@@ -207,7 +207,8 @@ export default function App() {
       const matchesStoreType = !storeTypeBrands || storeTypeBrands.has(product.brand);
       const matchesShipping = !shippingBrands || shippingBrands.has(product.brand);
       const matchesPrice =
-        product.price >= values.minPrice && product.price <= values.maxPrice;
+        product.price === 0 ||
+        (product.price >= values.minPrice && product.price <= values.maxPrice);
       const matchesSearch =
         search === '' ||
         product.name.toLowerCase().includes(search) ||
