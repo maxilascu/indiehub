@@ -24,8 +24,8 @@ interface FileItem {
   publicUrl?: string;
 }
 
-interface UploadBatchResult {
-  results: {
+interface SingleUploadResult {
+  result: {
     filename: string;
     articleCode: string;
     storagePath: string;
@@ -34,16 +34,8 @@ interface UploadBatchResult {
     status: 'uploaded' | 'skipped' | 'error';
     error?: string;
     publicUrl?: string;
-  }[];
-  summary: {
-    uploaded: number;
-    skipped: number;
-    errors: number;
-    total: number;
   };
 }
-
-const BATCH_SIZE = 5;
 
 function parseArticleCode(filename: string): {
   articleCode: string;
@@ -60,15 +52,6 @@ function parseArticleCode(filename: string): {
     };
   }
   return { articleCode: base.toUpperCase(), pageNumber: null, columnNumber: null };
-}
-
-function readFileAsDataURL(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 export default function AdminImages() {
@@ -140,52 +123,37 @@ export default function AdminImages() {
     setShowSummary(false);
   };
 
-  const uploadBatch = useCallback(
-    async (batch: FileItem[]): Promise<UploadBatchResult> => {
-      const filesPayload = await Promise.all(
-        batch.map(async (item) => ({
-          name: item.file.name,
-          contentType: item.file.type || 'image/png',
-          data: await readFileAsDataURL(item.file),
-        }))
-      );
+  const uploadSingleFile = useCallback(
+    async (item: FileItem): Promise<SingleUploadResult> => {
+      const formData = new FormData();
+      formData.append('file', item.file);
 
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-product-images`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'X-Upload-Secret': secret,
         },
-        body: JSON.stringify({ files: filesPayload }),
+        body: formData,
       });
 
       if (!response.ok) {
-        const errText = await response.text().catch(() => 'Error desconocido');
-        throw new Error(`Error del servidor (${response.status}): ${errText}`);
+        let errText = '';
+        try {
+          const errJson = await response.json();
+          errText = errJson.error || JSON.stringify(errJson);
+        } catch {
+          errText = await response.text().catch(() => 'No se pudo leer la respuesta del servidor');
+        }
+        throw new Error(`Servidor ${response.status}: ${errText}`);
       }
 
-      const json: UploadBatchResult = await response.json();
+      const json: SingleUploadResult = await response.json();
       return json;
     },
     [secret]
   );
-
-  const updateFileStatus = (
-    filenames: string[],
-    statusMap: Map<string, { status: FileItem['status']; error?: string; publicUrl?: string }>
-  ) => {
-    setFiles((prev) =>
-      prev.map((f) => {
-        const result = statusMap.get(f.file.name);
-        if (result) {
-          return { ...f, status: result.status, error: result.error, publicUrl: result.publicUrl };
-        }
-        return f;
-      })
-    );
-  };
 
   const uploadAll = async () => {
     const toUpload = files.filter((f) => f.status === 'pending' || f.status === 'error');
@@ -196,44 +164,42 @@ export default function AdminImages() {
     setProgress({ done: 0, total: toUpload.length });
 
     let done = 0;
-    for (let i = 0; i < toUpload.length; i += BATCH_SIZE) {
-      const batch = toUpload.slice(i, i + BATCH_SIZE);
-
-      const batchFilenames = batch.map((b) => b.file.name);
+    for (const item of toUpload) {
       setFiles((prev) =>
         prev.map((f) =>
-          batchFilenames.includes(f.file.name) ? { ...f, status: 'uploading' as const } : f
+          f.id === item.id ? { ...f, status: 'uploading' as const } : f
         )
       );
 
       try {
-        const result = await uploadBatch(batch);
-        const statusMap = new Map<
-          string,
-          { status: FileItem['status']; error?: string; publicUrl?: string }
-        >();
-        for (const r of result.results) {
-          statusMap.set(r.filename, {
-            status: r.status,
-            error: r.error,
-            publicUrl: r.publicUrl,
-          });
-        }
-        updateFileStatus(batchFilenames, statusMap);
+        const response = await uploadSingleFile(item);
+        const r = response.result;
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === item.id
+              ? { ...f, status: r.status, error: r.error, publicUrl: r.publicUrl }
+              : f
+          )
+        );
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
-        updateFileStatus(
-          batchFilenames,
-          new Map(
-            batchFilenames.map((name) => [
-              name,
-              { status: 'error' as const, error: errorMsg },
-            ])
+        let errorMsg = 'Error desconocido';
+        if (err instanceof Error) {
+          if (err.message === 'Failed to fetch') {
+            errorMsg = 'No se pudo conectar con el servidor. Verificá tu conexión a internet y que la función de servidor esté activa.';
+          } else if (err.message.includes('Failed to fetch')) {
+            errorMsg = err.message;
+          } else {
+            errorMsg = err.message;
+          }
+        }
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === item.id ? { ...f, status: 'error' as const, error: errorMsg } : f
           )
         );
       }
 
-      done += batch.length;
+      done += 1;
       setProgress({ done, total: toUpload.length });
     }
 
@@ -250,44 +216,40 @@ export default function AdminImages() {
     setProgress({ done: 0, total: failed.length });
 
     let done = 0;
-    for (let i = 0; i < failed.length; i += BATCH_SIZE) {
-      const batch = failed.slice(i, i + BATCH_SIZE);
-      const batchFilenames = batch.map((b) => b.file.name);
-
+    for (const item of failed) {
       setFiles((prev) =>
         prev.map((f) =>
-          batchFilenames.includes(f.file.name) ? { ...f, status: 'uploading' as const } : f
+          f.id === item.id ? { ...f, status: 'uploading' as const } : f
         )
       );
 
       try {
-        const result = await uploadBatch(batch);
-        const statusMap = new Map<
-          string,
-          { status: FileItem['status']; error?: string; publicUrl?: string }
-        >();
-        for (const r of result.results) {
-          statusMap.set(r.filename, {
-            status: r.status,
-            error: r.error,
-            publicUrl: r.publicUrl,
-          });
-        }
-        updateFileStatus(batchFilenames, statusMap);
+        const response = await uploadSingleFile(item);
+        const r = response.result;
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === item.id
+              ? { ...f, status: r.status, error: r.error, publicUrl: r.publicUrl }
+              : f
+          )
+        );
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
-        updateFileStatus(
-          batchFilenames,
-          new Map(
-            batchFilenames.map((name) => [
-              name,
-              { status: 'error' as const, error: errorMsg },
-            ])
+        let errorMsg = 'Error desconocido';
+        if (err instanceof Error) {
+          if (err.message === 'Failed to fetch') {
+            errorMsg = 'No se pudo conectar con el servidor. Verificá tu conexión a internet y que la función de servidor esté activa.';
+          } else {
+            errorMsg = err.message;
+          }
+        }
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === item.id ? { ...f, status: 'error' as const, error: errorMsg } : f
           )
         );
       }
 
-      done += batch.length;
+      done += 1;
       setProgress({ done, total: failed.length });
     }
 
@@ -417,6 +379,9 @@ export default function AdminImages() {
               multiple
               onChange={handleFileSelect}
               className="hidden"
+              // @ts-expect-error webkitdirectory is a non-standard attribute for folder selection
+              webkitdirectory=""
+              directory=""
             />
           </div>
           <p className="mt-3 text-xs text-neutral-500">

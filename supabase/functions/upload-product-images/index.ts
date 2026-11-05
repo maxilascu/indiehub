@@ -3,19 +3,11 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-Upload-Secret",
 };
 
 const BUCKET_ID = "indiehub-product-images";
 const TABLE = "product_images";
-
-interface UploadRequest {
-  files: {
-    name: string;
-    contentType: string;
-    data: string;
-  }[];
-}
 
 interface UploadResult {
   filename: string;
@@ -44,16 +36,6 @@ function parseArticleCode(filename: string): {
   }
   const fallback = base.split(/[_-]/).slice(0, 3).join("_");
   return { articleCode: fallback.toUpperCase(), pageNumber: null, columnNumber: null };
-}
-
-function decodeBase64(b64: string): Uint8Array {
-  const clean = b64.replace(/^data:[^;]+;base64,/, "").replace(/\s/g, "");
-  const binary = atob(clean);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
 }
 
 function timingSafeCompare(a: string, b: string): boolean {
@@ -86,14 +68,14 @@ Deno.serve(async (req: Request) => {
 
   if (!supabaseUrl || !serviceRoleKey) {
     return new Response(
-      JSON.stringify({ error: "Server misconfiguration" }),
+      JSON.stringify({ error: "Server misconfiguration: missing Supabase env vars" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
   if (!uploadSecret) {
     return new Response(
-      JSON.stringify({ error: "Upload secret not configured" }),
+      JSON.stringify({ error: "El secreto INDIEHUB_UPLOAD_SECRET no está configurado. Andá a Supabase Dashboard → Edge Functions → Secrets y agregalo." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -101,143 +83,149 @@ Deno.serve(async (req: Request) => {
   const providedSecret = req.headers.get("X-Upload-Secret");
   if (!providedSecret || !timingSafeCompare(providedSecret, uploadSecret)) {
     return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
+      JSON.stringify({ error: "Clave de administración incorrecta" }),
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  let body: UploadRequest;
+  let formData: FormData;
   try {
-    body = await req.json();
+    formData = await req.formData();
   } catch {
     return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
+      JSON.stringify({ error: "No se pudo leer el formulario multipart. Asegurate de enviar multipart/form-data." }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  if (!body.files || !Array.isArray(body.files) || body.files.length === 0) {
+  const file = formData.get("file");
+  if (!file || !(file instanceof File)) {
     return new Response(
-      JSON.stringify({ error: "No files provided" }),
+      JSON.stringify({ error: "No se encontró ningún archivo en la petición" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const results: UploadResult[] = [];
+  const filename = file.name;
+  const result: UploadResult = {
+    filename,
+    articleCode: "",
+    storagePath: "",
+    pageNumber: null,
+    columnNumber: null,
+    status: "error",
+  };
 
-  for (const file of body.files) {
-    const result: UploadResult = {
-      filename: file.name,
-      articleCode: "",
-      storagePath: "",
-      pageNumber: null,
-      columnNumber: null,
-      status: "error",
-    };
+  try {
+    const lowerName = filename.toLowerCase();
+    if (!lowerName.endsWith(".png")) {
+      result.error = "Solo se permiten archivos PNG";
+      return new Response(
+        JSON.stringify({ result }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    try {
-      const lowerName = file.name.toLowerCase();
-      if (!lowerName.endsWith(".png")) {
-        result.error = "Solo se permiten archivos PNG";
-        results.push(result);
-        continue;
-      }
+    const contentType = (file.type || "image/png").toLowerCase();
+    if (contentType !== "image/png") {
+      result.error = `Tipo de contenido inválido: ${file.type}. Debe ser image/png.`;
+      return new Response(
+        JSON.stringify({ result }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-      const contentType = (file.contentType || "image/png").toLowerCase();
-      if (contentType !== "image/png") {
-        result.error = "El tipo de contenido debe ser image/png";
-        results.push(result);
-        continue;
-      }
+    const { articleCode, pageNumber, columnNumber } = parseArticleCode(filename);
+    result.articleCode = articleCode;
+    result.pageNumber = pageNumber;
+    result.columnNumber = columnNumber;
+    result.storagePath = filename;
 
-      const { articleCode, pageNumber, columnNumber } = parseArticleCode(file.name);
-      result.articleCode = articleCode;
-      result.pageNumber = pageNumber;
-      result.columnNumber = columnNumber;
-      result.storagePath = file.name;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-      const { data: existing } = await supabase
-        .from(TABLE)
-        .select("id, storage_path")
-        .eq("storage_path", file.name)
-        .maybeSingle();
+    const { data: existing } = await supabase
+      .from(TABLE)
+      .select("id, storage_path")
+      .eq("storage_path", filename)
+      .maybeSingle();
 
-      if (existing) {
-        result.status = "skipped";
-        const { data: pub } = supabase.storage
-          .from(BUCKET_ID)
-          .getPublicUrl(file.name);
-        result.publicUrl = pub.publicUrl;
-        results.push(result);
-        continue;
-      }
+    if (existing) {
+      result.status = "skipped";
+      const { data: pub } = supabase.storage.from(BUCKET_ID).getPublicUrl(filename);
+      result.publicUrl = pub.publicUrl;
+      return new Response(
+        JSON.stringify({ result }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-      const fileBytes = decodeBase64(file.data);
+    const fileBuffer = await file.arrayBuffer();
 
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET_ID)
-        .upload(file.name, fileBytes, {
-          contentType: "image/png",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        result.error = `Storage error: ${uploadError.message}`;
-        results.push(result);
-        continue;
-      }
-
-      const { data: countData } = await supabase
-        .from(TABLE)
-        .select("id", { count: "exact", head: true })
-        .eq("article_code", articleCode);
-
-      const currentCount = (countData as unknown[] | null)?.length ?? 0;
-
-      const { error: dbError } = await supabase.from(TABLE).insert({
-        article_code: articleCode,
-        original_filename: file.name,
-        storage_path: file.name,
-        page_number: pageNumber,
-        column_number: columnNumber,
-        display_order: currentCount,
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_ID)
+      .upload(filename, fileBuffer, {
+        contentType: "image/png",
+        upsert: false,
       });
 
-      if (dbError) {
-        const { error: rmError } = await supabase.storage
-          .from(BUCKET_ID)
-          .remove([file.name]);
-        if (rmError) {
-          result.error = `DB error: ${dbError.message}; cleanup failed: ${rmError.message}`;
-        } else {
-          result.error = `DB error (file removed): ${dbError.message}`;
-        }
-        results.push(result);
-        continue;
-      }
-
-      result.status = "uploaded";
-      const { data: pub } = supabase.storage
-        .from(BUCKET_ID)
-        .getPublicUrl(file.name);
-      result.publicUrl = pub.publicUrl;
-      results.push(result);
-    } catch (err) {
-      result.error = err instanceof Error ? err.message : "Unknown error";
-      results.push(result);
+    if (uploadError) {
+      result.error = `Error al subir al bucket: ${uploadError.message}`;
+      return new Response(
+        JSON.stringify({ result }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    const { data: countData, error: countError } = await supabase
+      .from(TABLE)
+      .select("id", { count: "exact", head: true })
+      .eq("article_code", articleCode);
+
+    if (countError) {
+      const { error: rmError } = await supabase.storage.from(BUCKET_ID).remove([filename]);
+      result.error = `Error al contar imágenes existentes: ${countError.message}${rmError ? ` (cleanup: ${rmError.message})` : ""}`;
+      return new Response(
+        JSON.stringify({ result }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const currentCount = (countData as unknown[] | null)?.length ?? 0;
+
+    const { error: dbError } = await supabase.from(TABLE).insert({
+      article_code: articleCode,
+      original_filename: filename,
+      storage_path: filename,
+      page_number: pageNumber,
+      column_number: columnNumber,
+      display_order: currentCount,
+    });
+
+    if (dbError) {
+      const { error: rmError } = await supabase.storage.from(BUCKET_ID).remove([filename]);
+      if (rmError) {
+        result.error = `Error en base de datos: ${dbError.message}; no se pudo eliminar el archivo del bucket: ${rmError.message}`;
+      } else {
+        result.error = `Error en base de datos (archivo eliminado del bucket): ${dbError.message}`;
+      }
+      return new Response(
+        JSON.stringify({ result }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    result.status = "uploaded";
+    const { data: pub } = supabase.storage.from(BUCKET_ID).getPublicUrl(filename);
+    result.publicUrl = pub.publicUrl;
+    return new Response(
+      JSON.stringify({ result }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    result.error = err instanceof Error ? err.message : "Error desconocido en el servidor";
+    return new Response(
+      JSON.stringify({ result }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
-
-  const uploaded = results.filter((r) => r.status === "uploaded").length;
-  const skipped = results.filter((r) => r.status === "skipped").length;
-  const errors = results.filter((r) => r.status === "error").length;
-
-  return new Response(
-    JSON.stringify({
-      results,
-      summary: { uploaded, skipped, errors, total: results.length },
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
 });
