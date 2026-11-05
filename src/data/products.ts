@@ -83,6 +83,56 @@ export async function fetchBrands(): Promise<Brand[]> {
   }));
 }
 
+const PRODUCT_IMAGES_BUCKET = 'indiehub-product-images';
+
+export function normalizeArticleCode(value: string): string | null {
+  const match = value.match(/(\d+)(?:\.(\d+))?/);
+  if (!match) return null;
+  return `ART_${parseInt(match[1], 10)}${match[2] ? `.${match[2]}` : ''}`;
+}
+
+export function extractArticleCode(productName: string): string | null {
+  const match = productName.match(/\bArt\.?\s*(\d+(?:\.\d+)?)/i);
+  return match ? normalizeArticleCode(match[1]) : null;
+}
+
+function buildProductImageUrl(storagePath: string): string {
+  const encodedPath = storagePath.split('/').map(encodeURIComponent).join('/');
+  return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${encodedPath}`;
+}
+
+async function fetchProductImagesByArticle(): Promise<Map<string, string[]>> {
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const url =
+    `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/product_images` +
+    '?select=article_code,storage_path' +
+    '&article_code=not.is.null' +
+    '&order=display_order.asc,page_number.asc.nullslast,column_number.asc.nullslast,original_filename.asc';
+
+  const response = await fetch(url, {
+    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error al cargar fotografías (${response.status})`);
+  }
+
+  const rows: unknown = await response.json();
+  if (!Array.isArray(rows)) {
+    throw new Error('Formato de fotografías inválido');
+  }
+
+  const photosByArticle = new Map<string, string[]>();
+  for (const row of rows as { article_code: string; storage_path: string }[]) {
+    const code = normalizeArticleCode(row.article_code);
+    if (!code) continue;
+    const photos = photosByArticle.get(code) ?? [];
+    photos.push(buildProductImageUrl(row.storage_path));
+    photosByArticle.set(code, photos);
+  }
+  return photosByArticle;
+}
+
 export async function fetchProducts(): Promise<Product[]> {
   const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/products-csv`;
   const headers = {
@@ -90,7 +140,10 @@ export async function fetchProducts(): Promise<Product[]> {
     'Content-Type': 'application/json',
   };
 
-  const response = await fetch(url, { headers });
+  const [response, photosByArticle] = await Promise.all([
+    fetch(url, { headers }),
+    fetchProductImagesByArticle(),
+  ]);
 
   if (!response.ok) {
     throw new Error(`Error al cargar productos (${response.status})`);
@@ -102,12 +155,17 @@ export async function fetchProducts(): Promise<Product[]> {
     throw new Error('Formato de respuesta inválido');
   }
 
-  return json.products.map((product) => ({
-    ...product,
-    description: product.description ?? '',
-    sizes: product.sizes ?? [],
-    images: product.images?.length ? product.images : [product.image],
-  }));
+  return json.products.map((product) => {
+    const articleCode = extractArticleCode(product.name);
+    const photos = (articleCode && photosByArticle.get(articleCode)) || [];
+    return {
+      ...product,
+      description: product.description ?? '',
+      sizes: product.sizes ?? [],
+      image: photos[0] ?? FALLBACK_PRODUCT_IMAGE,
+      images: photos.length ? photos : [FALLBACK_PRODUCT_IMAGE],
+    };
+  });
 }
 
 export function getRelatedProducts(product: Product, all: Product[], limit = 10): Product[] {
