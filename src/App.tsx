@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, SlidersHorizontal } from 'lucide-react';
 import Header, { type View } from '@/components/Header';
 import Hero from '@/components/Hero';
+import AdminImages from '@/components/AdminImages';
 import PromotionsBanner from '@/components/PromotionsBanner';
 import BrandsGrid from '@/components/BrandsGrid';
 import FiltersPanel, {
@@ -36,6 +37,8 @@ import {
 const DEFAULT_SORT: SortOption = 'recent';
 
 export default function App() {
+  const isAdminImages = window.location.pathname === '/admin/imagenes';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -296,6 +299,10 @@ export default function App() {
     setDraftFilters(cleared);
     setSelectedBrand('');
   };
+
+  if (isAdminImages) {
+    return <AdminImages />;
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">

@@ -5,3 +5,7 @@ entrypoint = "./functions/products-csv/index.ts"
 [functions.brands-csv]
 verify_jwt = false
 entrypoint = "./functions/brands-csv/index.ts"
+
+[functions.upload-product-images]
+verify_jwt = false
+entrypoint = "./functions/upload-product-images/index.ts"

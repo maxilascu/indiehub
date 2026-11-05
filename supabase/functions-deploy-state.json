@@ -8,6 +8,10 @@
     "products-csv": {
       "hasChanged": false,
       "hash": "4ac39e5949792a1e28d1734df394cd5f2cc9727909384f86400928cfcf627846"
+    },
+    "upload-product-images": {
+      "hasChanged": false,
+      "hash": "007cbe120a9f7fae825dfa77efc3b17c8bcbac6dc4170ef757135e9d4a3b5046"
     }
   }
 }
