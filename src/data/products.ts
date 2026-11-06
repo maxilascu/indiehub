@@ -65,7 +65,7 @@ export function normalizeArticleCode(value: string): string | null {
   return `ART_${parseInt(match[1], 10)}${match[2] ? `.${match[2]}` : ''}`;
 }
 
-function buildProductImageUrl(storagePath: string): string {
+export function buildProductImageUrl(storagePath: string): string {
   const encodedPath = storagePath.split('/').map(encodeURIComponent).join('/');
   return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${encodedPath}`;
 }
