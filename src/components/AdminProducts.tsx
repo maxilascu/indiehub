@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Package, Plus, RefreshCw, Search } from 'lucide-react';
 import { STATUS_LABELS, type ProductStatus } from '@/lib/adminProductForm';
 import {
@@ -92,7 +92,7 @@ interface AdminShellProps {
   title: string;
   backLabel: string;
   onBack: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 function AdminShell({ title, backLabel, onBack, children }: AdminShellProps) {
@@ -198,7 +198,7 @@ function ProductList({ brands, onOpen, onCreate }: ProductListProps) {
   const hasActiveFilters = filters.search !== '' || filters.brandId !== '' || filters.status !== 'all';
 
   const updateFilters = (patch: Partial<ProductListFilters>) => {
-    setFilters((current) => ({ ...current, ...patch, page: 'page' in patch ? patch.page ?? 1 : 1 }));
+    setFilters((current) => ({ ...current, ...patch, page: patch.page ?? 1 }));
   };
 
   return (
@@ -229,7 +229,7 @@ function ProductList({ brands, onOpen, onCreate }: ProductListProps) {
           </select>
           <select
             value={filters.status}
-            onChange={(event) => updateFilters({ status: event.target.value as ProductFormStatusFilter })}
+            onChange={(event) => updateFilters({ status: event.target.value as ProductStatus | 'all' })}
             className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           >
             <option value="all">Todos los estados</option>

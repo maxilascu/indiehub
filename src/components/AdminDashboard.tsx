@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ImagePlus, LogOut, Loader2 } from 'lucide-react';
+import { ImagePlus, LogOut, Loader2, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -73,6 +73,20 @@ export default function AdminDashboard({ email }: Props) {
               <h2 className="text-sm font-bold text-neutral-900">Gestión de imágenes</h2>
               <p className="mt-1 text-xs text-neutral-500">
                 Cargar y administrar fotografías de productos.
+              </p>
+            </div>
+          </a>
+          <a
+            href="/admin/productos"
+            className="group flex flex-col gap-3 rounded-2xl bg-white p-6 ring-1 ring-neutral-200 transition duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-neutral-900/5 hover:ring-neutral-300"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-200">
+              <Package className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-neutral-900">Gestión de productos</h2>
+              <p className="mt-1 text-xs text-neutral-500">
+                Crear, editar, publicar y archivar productos del catálogo.
               </p>
             </div>
           </a>

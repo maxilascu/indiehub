@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import Header, { type View } from '@/components/Header';
 import Hero from '@/components/Hero';
 import AdminImages from '@/components/AdminImages';
+import AdminProducts from '@/components/AdminProducts';
 import Login from '@/components/Login';
 import AdminDashboard from '@/components/AdminDashboard';
 import PromotionsBanner from '@/components/PromotionsBanner';
@@ -73,9 +74,10 @@ export default function App() {
 
   const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
   const isAdminImages = pathname === '/admin/imagenes';
+  const isAdminProducts = pathname === '/admin/productos';
   const isAdmin = pathname === '/admin';
   const isLogin = pathname === '/login';
-  const isAdminArea = isAdmin || isAdminImages;
+  const isAdminArea = isAdmin || isAdminImages || isAdminProducts;
 
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -350,6 +352,7 @@ export default function App() {
       );
     }
     if (isAdminImages) return <AdminImages />;
+    if (isAdminProducts) return <AdminProducts />;
     return <AdminDashboard email={session.user.email ?? 'administrador'} />;
   }
 
