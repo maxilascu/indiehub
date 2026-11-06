@@ -72,37 +72,41 @@ export default function AdminImages() {
   const [selectedBrandId, setSelectedBrandId] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setBrandsLoading(true);
-        setBrandsError(null);
-        const { data, error } = await supabase
-          .from('brands')
-          .select('id, name')
-          .order('name.asc');
-        if (error) throw error;
-        if (!cancelled) {
-          setBrands((data as BrandOption[]) ?? []);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setBrands([]);
-          setBrandsError(
-            err instanceof Error
-              ? err.message
-              : 'No se pudieron cargar las marcas.'
-          );
-        }
-      } finally {
-        if (!cancelled) setBrandsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const loadBrands = useCallback(async () => {
+    setBrandsLoading(true);
+    setBrandsError(null);
+
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    if (sessionErr) {
+      setBrands([]);
+      setBrandsError(`No se pudo leer la sesión: ${sessionErr.message}`);
+      setBrandsLoading(false);
+      return;
+    }
+    if (!sessionData.session) {
+      setBrands([]);
+      setBrandsError('No hay una sesión activa. Volvé a iniciar sesión para cargar las marcas.');
+      setBrandsLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('brands')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (error) {
+      setBrands([]);
+      setBrandsError(`Supabase devolvió un error al cargar las marcas: ${error.message}`);
+    } else {
+      setBrands(Array.isArray(data) ? (data as BrandOption[]) : []);
+    }
+    setBrandsLoading(false);
   }, []);
+
+  useEffect(() => {
+    void loadBrands();
+  }, [loadBrands]);
 
   const createFileItems = useCallback(async (fileList: FileList): Promise<FileItem[]> => {
     const items: FileItem[] = [];
@@ -361,13 +365,21 @@ export default function AdminImages() {
               <Loader2 className="h-4 w-4 animate-spin" />
               Cargando marcas...
             </div>
-          ) : brands.length === 0 ? (
-            <div>
-              <p className="text-sm text-neutral-500">No hay marcas disponibles.</p>
-              {brandsError && (
-                <p className="mt-1 text-xs text-red-400">{brandsError}</p>
-              )}
+          ) : brandsError ? (
+            <div className="flex flex-col items-start gap-3">
+              <p className="flex items-start gap-2 text-sm text-red-400">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>{brandsError}</span>
+              </p>
+              <button
+                onClick={() => void loadBrands()}
+                className="rounded-lg bg-neutral-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-700"
+              >
+                Reintentar
+              </button>
             </div>
+          ) : brands.length === 0 ? (
+            <p className="text-sm text-neutral-500">No hay marcas cargadas en el catálogo.</p>
           ) : (
             <select
               value={selectedBrandId}
