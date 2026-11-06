@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ImagePlus,
-  Lock,
   Upload,
   RotateCcw,
   CheckCircle2,
@@ -10,7 +9,9 @@ import {
   FileWarning,
   X,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface FileItem {
   id: string;
@@ -37,6 +38,11 @@ interface SingleUploadResult {
   };
 }
 
+interface BrandOption {
+  id: string;
+  name: string;
+}
+
 function parseArticleCode(filename: string): {
   articleCode: string | null;
   pageNumber: number | null;
@@ -54,28 +60,40 @@ function parseArticleCode(filename: string): {
 }
 
 export default function AdminImages() {
-  const [secret, setSecret] = useState('');
-  const [secretEntered, setSecretEntered] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [brands, setBrands] = useState<BrandOption[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [selectedBrandId, setSelectedBrandId] = useState('');
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
-  const handleSecretSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (secret.trim()) setSecretEntered(true);
-  };
-
-  const handleSecretChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSecret(e.target.value);
-  };
-
-  const resetSecret = () => {
-    setSecret('');
-    setSecretEntered(false);
-  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setBrandsLoading(true);
+        const { data, error } = await supabase
+          .from('brands')
+          .select('id, name')
+          .order('name.asc');
+        if (error) throw error;
+        if (!cancelled) {
+          setBrands((data as BrandOption[]) ?? []);
+        }
+      } catch {
+        if (!cancelled) setBrands([]);
+      } finally {
+        if (!cancelled) setBrandsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const createFileItems = useCallback(async (fileList: FileList): Promise<FileItem[]> => {
     const items: FileItem[] = [];
@@ -123,19 +141,30 @@ export default function AdminImages() {
   };
 
   const uploadSingleFile = useCallback(
-    async (item: FileItem): Promise<SingleUploadResult> => {
+    async (item: FileItem, brandId: string): Promise<SingleUploadResult> => {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr || !sessionData.session) {
+        throw new Error('Tu sesión expiró. Volvé a iniciar sesión para continuar.');
+      }
+
+      const accessToken = sessionData.session.access_token;
+
       const formData = new FormData();
       formData.append('file', item.file);
+      formData.append('brand_id', brandId);
 
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-product-images`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'X-Upload-Secret': secret,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: formData,
       });
+
+      if (response.status === 401) {
+        throw new Error('Tu sesión no es válida o expiró. Volvé a iniciar sesión.');
+      }
 
       if (!response.ok) {
         let errText = '';
@@ -151,10 +180,22 @@ export default function AdminImages() {
       const json: SingleUploadResult = await response.json();
       return json;
     },
-    [secret]
+    []
   );
 
   const uploadAll = async () => {
+    if (!selectedBrandId) {
+      setSessionError('Seleccioná una marca antes de subir imágenes.');
+      return;
+    }
+
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    if (sessionErr || !sessionData.session) {
+      setSessionError('Tu sesión expiró. Volvé a iniciar sesión para continuar.');
+      return;
+    }
+    setSessionError(null);
+
     const toUpload = files.filter((f) => f.status === 'pending' || f.status === 'error');
     if (toUpload.length === 0) return;
 
@@ -171,7 +212,7 @@ export default function AdminImages() {
       );
 
       try {
-        const response = await uploadSingleFile(item);
+        const response = await uploadSingleFile(item, selectedBrandId);
         const r = response.result;
         setFiles((prev) =>
           prev.map((f) =>
@@ -185,8 +226,6 @@ export default function AdminImages() {
         if (err instanceof Error) {
           if (err.message === 'Failed to fetch') {
             errorMsg = 'No se pudo conectar con el servidor. Verificá tu conexión a internet y que la función de servidor esté activa.';
-          } else if (err.message.includes('Failed to fetch')) {
-            errorMsg = err.message;
           } else {
             errorMsg = err.message;
           }
@@ -207,6 +246,18 @@ export default function AdminImages() {
   };
 
   const retryFailed = async () => {
+    if (!selectedBrandId) {
+      setSessionError('Seleccioná una marca antes de subir imágenes.');
+      return;
+    }
+
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    if (sessionErr || !sessionData.session) {
+      setSessionError('Tu sesión expiró. Volvé a iniciar sesión para continuar.');
+      return;
+    }
+    setSessionError(null);
+
     const failed = files.filter((f) => f.status === 'error');
     if (failed.length === 0) return;
 
@@ -223,7 +274,7 @@ export default function AdminImages() {
       );
 
       try {
-        const response = await uploadSingleFile(item);
+        const response = await uploadSingleFile(item, selectedBrandId);
         const r = response.result;
         setFiles((prev) =>
           prev.map((f) =>
@@ -275,45 +326,6 @@ export default function AdminImages() {
     };
   }, []);
 
-  if (!secretEntered) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
-        <div className="w-full max-w-sm">
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/20">
-              <Lock className="h-6 w-6 text-emerald-400" />
-            </div>
-            <h1 className="text-lg font-bold text-white">Administración de imágenes</h1>
-            <p className="mt-1 text-sm text-neutral-400">
-              Ingresá la clave de administración para continuar.
-            </p>
-          </div>
-          <form onSubmit={handleSecretSubmit} className="space-y-3">
-            <input
-              type="password"
-              value={secret}
-              onChange={handleSecretChange}
-              placeholder="Clave de administración"
-              autoFocus
-              autoComplete="off"
-              className="w-full rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white placeholder-neutral-500 ring-1 ring-neutral-800 transition focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-            <button
-              type="submit"
-              disabled={!secret.trim()}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-            >
-              Ingresar
-            </button>
-          </form>
-          <p className="mt-4 text-center text-xs text-neutral-600">
-            La clave se envía únicamente al servidor y no se guarda en el navegador.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur">
@@ -322,16 +334,50 @@ export default function AdminImages() {
             <ImagePlus className="h-5 w-5 text-emerald-400" />
             <span className="text-sm font-bold">Carga de imágenes</span>
           </div>
-          <button
-            onClick={resetSecret}
+          <a
+            href="/admin"
             className="text-xs font-medium text-neutral-400 transition hover:text-white"
           >
-            Cerrar sesión
-          </button>
+            Volver al panel
+          </a>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
+        {/* Selector de marca */}
+        <div className="mb-6 rounded-xl bg-neutral-900 p-5 ring-1 ring-neutral-800">
+          <h2 className="mb-3 text-sm font-semibold text-neutral-200">Marca destino</h2>
+          {brandsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-neutral-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando marcas...
+            </div>
+          ) : brands.length === 0 ? (
+            <p className="text-sm text-neutral-500">No hay marcas disponibles.</p>
+          ) : (
+            <select
+              value={selectedBrandId}
+              onChange={(e) => setSelectedBrandId(e.target.value)}
+              disabled={uploading}
+              className="w-full max-w-sm rounded-lg bg-neutral-800 px-4 py-2.5 text-sm text-white ring-1 ring-neutral-700 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+            >
+              <option value="">Seleccionar marca...</option>
+              {brands.map((brand) => (
+                <option key={brand.id} value={brand.id}>
+                  {brand.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {sessionError && (
+          <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-500/10 p-4 ring-1 ring-red-500/20">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-400" />
+            <p className="text-sm text-red-400">{sessionError}</p>
+          </div>
+        )}
+
         {/* Selector de archivos */}
         <div className="mb-6 rounded-xl bg-neutral-900 p-5 ring-1 ring-neutral-800">
           <h2 className="mb-3 text-sm font-semibold text-neutral-200">Seleccionar imágenes</h2>
@@ -384,7 +430,7 @@ export default function AdminImages() {
             />
           </div>
           <p className="mt-3 text-xs text-neutral-500">
-            Solo se aceptan archivos PNG. Los nombres deben seguir el patrón ART_###_P##.png
+            Solo se aceptan archivos PNG (máx. 10 MB). Los nombres deben seguir el patrón ART_###_P##.png
             (ej. ART_17_P35.png, ART_205_P06_C1.png).
           </p>
         </div>
@@ -447,7 +493,7 @@ export default function AdminImages() {
           <div className="mb-6 flex gap-3">
             <button
               onClick={uploadAll}
-              disabled={stats.pending === 0 && stats.error === 0}
+              disabled={stats.pending === 0 && stats.error === 0 || !selectedBrandId}
               className="flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50"
             >
               <Upload className="h-4 w-4" />
@@ -456,7 +502,8 @@ export default function AdminImages() {
             {stats.error > 0 && (
               <button
                 onClick={retryFailed}
-                className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500"
+                disabled={!selectedBrandId}
+                className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-50"
               >
                 <RotateCcw className="h-4 w-4" />
                 Reintentar {stats.error} fallidos
@@ -527,7 +574,7 @@ export default function AdminImages() {
           <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-800 py-20 text-center">
             <ImagePlus className="mb-3 h-10 w-10 text-neutral-700" />
             <p className="text-sm text-neutral-500">
-              No hay archivos seleccionados. Elegí una carpeta o archivos PNG para empezar.
+              No hay archivos seleccionados. Elegí una marca, luego una carpeta o archivos PNG para empezar.
             </p>
           </div>
         )}
