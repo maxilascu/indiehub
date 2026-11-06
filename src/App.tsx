@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Loader2, SlidersHorizontal } from 'lucide-react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import Header, { type View } from '@/components/Header';
 import Hero from '@/components/Hero';
 import AdminImages from '@/components/AdminImages';
+import Login from '@/components/Login';
+import AdminDashboard from '@/components/AdminDashboard';
 import PromotionsBanner from '@/components/PromotionsBanner';
 import BrandsGrid from '@/components/BrandsGrid';
 import FiltersPanel, {
@@ -37,8 +41,6 @@ import {
 const DEFAULT_SORT: SortOption = 'recent';
 
 export default function App() {
-  const isAdminImages = window.location.pathname === '/admin/imagenes';
-
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,36 @@ export default function App() {
   });
   const [draftFilters, setDraftFilters] = useState<FilterValues>(filters);
   const [termsOpen, setTermsOpen] = useState(false);
+
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const isAdminImages = pathname === '/admin/imagenes';
+  const isAdmin = pathname === '/admin';
+  const isLogin = pathname === '/login';
+  const isAdminArea = isAdmin || isAdminImages;
+
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+
+    const { data: authData } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
+      setSession(newSession);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      authData.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const handler = () => setTermsOpen(true);
@@ -301,8 +333,43 @@ export default function App() {
     setSelectedBrand('');
   };
 
-  if (isAdminImages) {
-    return <AdminImages />;
+  if (isAdminArea) {
+    if (authLoading) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        </div>
+      );
+    }
+    if (!session) {
+      window.location.replace('/login');
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        </div>
+      );
+    }
+    if (isAdminImages) return <AdminImages />;
+    return <AdminDashboard email={session.user.email ?? 'administrador'} />;
+  }
+
+  if (isLogin) {
+    if (authLoading) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        </div>
+      );
+    }
+    if (session) {
+      window.location.replace('/admin');
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        </div>
+      );
+    }
+    return <Login />;
   }
 
   return (
