@@ -175,12 +175,30 @@ export default function AdminProductEditor({ productId, brands, onCreated }: Pro
   };
 
   const handleSave = async () => {
-    const validation = validateProductForm(values);
+    setSaveError(null);
+
+    let validation: ProductFormErrors;
+    try {
+      validation = validateProductForm(values);
+    } catch (cause) {
+      // Keep unexpected form-data/type errors visible instead of silently
+      // rejecting the async click handler before the loading state starts.
+      console.error('Error al validar el producto', cause);
+      setSaveError(
+        cause instanceof Error
+          ? `No se pudo validar el formulario: ${cause.message}`
+          : 'No se pudo validar el formulario. Revisá los datos e intentá nuevamente.'
+      );
+      return;
+    }
+
     setErrors(validation);
-    if (Object.keys(validation).length > 0) return;
+    if (Object.keys(validation).length > 0) {
+      setSaveError('Hay campos para corregir. Revisá los mensajes marcados en el formulario.');
+      return;
+    }
 
     setSaving(true);
-    setSaveError(null);
     try {
       const id = await saveAdminProduct(productId, values);
       setSavedNotice(true);
