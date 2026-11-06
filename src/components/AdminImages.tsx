@@ -68,6 +68,7 @@ export default function AdminImages() {
   const [showSummary, setShowSummary] = useState(false);
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
+  const [brandsError, setBrandsError] = useState<string | null>(null);
   const [selectedBrandId, setSelectedBrandId] = useState('');
   const [sessionError, setSessionError] = useState<string | null>(null);
 
@@ -76,6 +77,7 @@ export default function AdminImages() {
     (async () => {
       try {
         setBrandsLoading(true);
+        setBrandsError(null);
         const { data, error } = await supabase
           .from('brands')
           .select('id, name')
@@ -84,8 +86,15 @@ export default function AdminImages() {
         if (!cancelled) {
           setBrands((data as BrandOption[]) ?? []);
         }
-      } catch {
-        if (!cancelled) setBrands([]);
+      } catch (err) {
+        if (!cancelled) {
+          setBrands([]);
+          setBrandsError(
+            err instanceof Error
+              ? err.message
+              : 'No se pudieron cargar las marcas.'
+          );
+        }
       } finally {
         if (!cancelled) setBrandsLoading(false);
       }
@@ -353,7 +362,12 @@ export default function AdminImages() {
               Cargando marcas...
             </div>
           ) : brands.length === 0 ? (
-            <p className="text-sm text-neutral-500">No hay marcas disponibles.</p>
+            <div>
+              <p className="text-sm text-neutral-500">No hay marcas disponibles.</p>
+              {brandsError && (
+                <p className="mt-1 text-xs text-red-400">{brandsError}</p>
+              )}
+            </div>
           ) : (
             <select
               value={selectedBrandId}
