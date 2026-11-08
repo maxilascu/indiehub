@@ -8,6 +8,7 @@ import AdminImages from '@/components/AdminImages';
 import AdminProducts from '@/components/AdminProducts';
 import Login from '@/components/Login';
 import AdminDashboard from '@/components/AdminDashboard';
+import AdminImports from '@/components/AdminImports';
 import PromotionsBanner from '@/components/PromotionsBanner';
 import BrandsGrid from '@/components/BrandsGrid';
 import FiltersPanel, {
@@ -75,13 +76,15 @@ export default function App() {
   const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
   const isAdminImages = pathname === '/admin/imagenes';
   const isAdminProducts = pathname === '/admin/productos';
+  const isAdminImports = pathname === '/admin/importaciones';
   const isAdmin = pathname === '/admin';
   const isLogin = pathname === '/login';
-  const isAdminArea = isAdmin || isAdminImages || isAdminProducts;
+  const isAdminArea = isAdmin || isAdminImages || isAdminProducts || isAdminImports;
 
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [adminRole, setAdminRole] = useState<boolean | null>(null);
+  const [adminCheckFailed, setAdminCheckFailed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -96,7 +99,10 @@ export default function App() {
       if (!mounted) return;
       setSession(newSession);
       setAuthLoading(false);
-      if (!newSession) setAdminRole(null);
+      if (!newSession) {
+        setAdminRole(null);
+        setAdminCheckFailed(false);
+      }
     });
 
     return () => {
@@ -109,8 +115,10 @@ export default function App() {
     if (!session || !isAdminArea) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.rpc('has_app_role', { required_role: 'admin' });
-      if (!cancelled) setAdminRole(data === true);
+      const { data, error } = await supabase.rpc('has_app_role', { required_role: 'admin' });
+      if (cancelled) return;
+      setAdminCheckFailed(Boolean(error));
+      setAdminRole(error ? null : data === true);
     })();
     return () => {
       cancelled = true;
@@ -365,6 +373,21 @@ export default function App() {
         </div>
       );
     }
+    if (adminCheckFailed) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+          <div className="max-w-sm text-center">
+            <p className="text-sm font-semibold text-neutral-900">No pudimos verificar tus permisos.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 text-xs font-medium text-emerald-600 underline-offset-2 hover:underline"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      );
+    }
     if (adminRole === null) {
       return (
         <div className="flex min-h-screen items-center justify-center bg-neutral-50">
@@ -386,6 +409,7 @@ export default function App() {
     }
     if (isAdminImages) return <AdminImages />;
     if (isAdminProducts) return <AdminProducts />;
+    if (isAdminImports) return <AdminImports />;
     return <AdminDashboard email={session.user.email ?? 'administrador'} />;
   }
 
