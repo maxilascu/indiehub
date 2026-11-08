@@ -81,6 +81,7 @@ export default function App() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [adminRole, setAdminRole] = useState<boolean | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -95,6 +96,7 @@ export default function App() {
       if (!mounted) return;
       setSession(newSession);
       setAuthLoading(false);
+      if (!newSession) setAdminRole(null);
     });
 
     return () => {
@@ -102,6 +104,18 @@ export default function App() {
       authData.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!session || !isAdminArea) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.rpc('has_app_role', { required_role: 'admin' });
+      if (!cancelled) setAdminRole(data === true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, isAdminArea]);
 
   useEffect(() => {
     const handler = () => setTermsOpen(true);
@@ -348,6 +362,25 @@ export default function App() {
       return (
         <div className="flex min-h-screen items-center justify-center bg-neutral-50">
           <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        </div>
+      );
+    }
+    if (adminRole === null) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+        </div>
+      );
+    }
+    if (adminRole === false) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+          <div className="max-w-sm text-center">
+            <p className="text-sm font-semibold text-neutral-900">No tenés permisos de administrador.</p>
+            <a href="/" className="mt-4 inline-block text-xs font-medium text-emerald-600 underline-offset-2 hover:underline">
+              Volver al catálogo
+            </a>
+          </div>
         </div>
       );
     }
