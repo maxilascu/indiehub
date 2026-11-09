@@ -192,18 +192,37 @@ export async function requeueImportJob(jobId: string): Promise<void> {
 export interface ProcessImportResult {
   ok: boolean;
   jobId: string;
-  outcome: 'completed' | 'needs_review' | 'failed';
+  outcome: 'completed' | 'needs_review' | 'failed' | 'processing';
   items: number;
   assets: number;
   needsOcr: boolean;
   warnings: string[];
+  continue: boolean;
+  nextPage?: number;
   error?: string;
 }
 
-function isProcessResult(value: unknown): value is ProcessImportResult {
+interface ProcessImportResponse {
+  ok: boolean;
+  job_id: string;
+  outcome: 'completed' | 'needs_review' | 'failed' | 'processing';
+  items?: number;
+  assets?: number;
+  needs_ocr?: boolean;
+  warnings?: unknown[];
+  continue?: boolean;
+  next_page?: number;
+  error?: string;
+}
+
+function isProcessResult(value: unknown): value is ProcessImportResponse {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return typeof v.ok === 'boolean' && typeof v.job_id === 'string' && typeof v.outcome === 'string';
+  return (
+    typeof v.ok === 'boolean' &&
+    typeof v.job_id === 'string' &&
+    (v.outcome === 'completed' || v.outcome === 'needs_review' || v.outcome === 'failed' || v.outcome === 'processing')
+  );
 }
 
 export async function triggerImportProcessing(jobId: string): Promise<ProcessImportResult> {
@@ -236,12 +255,15 @@ export async function triggerImportProcessing(jobId: string): Promise<ProcessImp
   if (!isProcessResult(body)) throw new Error('Respuesta inesperada del procesador');
   return {
     ok: body.ok,
-    jobId: body.jobId,
+    jobId: body.job_id,
     outcome: body.outcome as ProcessImportResult['outcome'],
-    items: body.items,
-    assets: body.assets,
-    needsOcr: body.needsOcr,
-    warnings: body.warnings,
+    items: Number(body.items ?? 0),
+    assets: Number(body.assets ?? 0),
+    needsOcr: body.needs_ocr === true,
+    warnings: Array.isArray(body.warnings) ? body.warnings.filter((value: unknown): value is string => typeof value === 'string') : [],
+    continue: body.continue === true,
+    nextPage: Number.isFinite(Number(body.next_page)) ? Number(body.next_page) : undefined,
     error: body.error,
   };
 }
+
