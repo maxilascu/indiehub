@@ -184,6 +184,11 @@ export async function confirmImportUpload(jobId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function requeueImportJob(jobId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_requeue_import_job', { p_job_id: jobId });
+  if (error) throw error;
+}
+
 export interface ProcessImportResult {
   ok: boolean;
   jobId: string;

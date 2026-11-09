@@ -8,6 +8,7 @@ import {
   formatImportDate,
   getSourceLabel,
   getStatusLabel,
+  requeueImportJob,
   triggerImportProcessing,
   type ImportJobRow,
   type ProcessImportResult,
@@ -101,7 +102,26 @@ export default function AdminImportDetail({ jobId, onBack }: Props) {
     }
   };
 
+  const handleReprocess = async () => {
+    if (!job) return;
+    setProcessing(true);
+    setProcessError(null);
+    setProcessResult(null);
+    try {
+      await requeueImportJob(job.id);
+      await load();
+      const result = await triggerImportProcessing(job.id);
+      setProcessResult(result);
+      await load();
+    } catch (cause) {
+      setProcessError(cause instanceof Error ? cause.message : getAdminErrorMessage(cause));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const canProcess = job && (job.status === 'queued' || job.status === 'failed') && job.source_type === 'pdf';
+  const canReprocess = job && (job.status === 'needs_review' || job.status === 'failed' || job.status === 'completed') && job.source_type === 'pdf';
 
   const fileName = job?.storage_path ? job.storage_path.split('/').pop() ?? '' : '';
 
@@ -191,6 +211,48 @@ export default function AdminImportDetail({ jobId, onBack }: Props) {
                 </button>
                 <p className="mt-2 text-xs text-neutral-500">
                   Lee el PDF, extrae texto, detecta imágenes y genera candidatos de producto.
+                </p>
+                {processError && (
+                  <p className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700 ring-1 ring-red-100">
+                    <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+                    <span>{processError}</span>
+                  </p>
+                )}
+                {processResult && (
+                  <div className="mt-4 space-y-3 rounded-lg bg-neutral-50 p-4 ring-1 ring-neutral-200">
+                    <div className="flex flex-wrap gap-4 text-xs">
+                      <span className="font-semibold text-neutral-700">
+                        Resultado: <span className={processResult.outcome === 'completed' ? 'text-emerald-600' : processResult.outcome === 'failed' ? 'text-red-600' : 'text-amber-600'}>{processResult.outcome === 'completed' ? 'Completada' : processResult.outcome === 'failed' ? 'Fallida' : 'Revisión pendiente'}</span>
+                      </span>
+                      <span className="font-semibold text-neutral-700">Items: <span className="text-neutral-900">{processResult.items}</span></span>
+                      <span className="font-semibold text-neutral-700">Assets: <span className="text-neutral-900">{processResult.assets}</span></span>
+                      {processResult.needsOcr && <span className="font-semibold text-amber-600">Requiere OCR</span>}
+                    </div>
+                    {processResult.warnings.length > 0 && (
+                      <ul className="space-y-1 text-xs text-neutral-600">
+                        {processResult.warnings.map((w, i) => (
+                          <li key={i}>· {w}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {canReprocess && !canProcess && (
+              <section className="rounded-2xl bg-white p-6 ring-1 ring-neutral-200">
+                <h2 className="mb-4 text-sm font-bold text-neutral-900">Reprocesamiento</h2>
+                <button
+                  onClick={() => void handleReprocess()}
+                  disabled={processing}
+                  className="flex items-center gap-1.5 rounded-lg bg-neutral-800 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-900 disabled:opacity-60"
+                >
+                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  {processing ? 'Reprocesando…' : 'Reprocesar importación'}
+                </button>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Vuelve a procesar el PDF original con la versión actual del procesador. Los resultados anteriores se reemplazan.
                 </p>
                 {processError && (
                   <p className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700 ring-1 ring-red-100">
