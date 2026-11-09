@@ -68,6 +68,49 @@ export default function AdminImportDetail({ jobId, onBack }: Props) {
     void load();
   }, [load]);
 
+  const runProcessingBatches = async (targetJobId: string): Promise<ProcessImportResult> => {
+    const MAX_BATCHES_PER_RUN = 100;
+    let totalItems = 0;
+    let totalAssets = 0;
+    let needsOcr = false;
+    let previousNextPage = 0;
+    const warnings = new Set<string>();
+
+    for (let batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
+      const result = await triggerImportProcessing(targetJobId);
+      totalItems += result.items;
+      totalAssets += result.assets;
+      needsOcr = needsOcr || result.needsOcr;
+      result.warnings.forEach((warning) => warnings.add(warning));
+
+      // Each call finishes before the next HTTP request starts. This keeps
+      // every Supabase Edge invocation independent and below its time limit.
+      await load();
+
+      if (result.outcome !== 'processing') {
+        return {
+          ...result,
+          items: totalItems,
+          assets: totalAssets,
+          needsOcr,
+          warnings: [...warnings],
+        };
+      }
+
+      if (!result.continue || !result.nextPage) {
+        throw new Error('El procesador informó que faltan tandas, pero no devolvió la página siguiente.');
+      }
+      if (result.nextPage <= previousNextPage) {
+        throw new Error('La importación no avanzó de página. Se detuvo para evitar un ciclo.');
+      }
+      previousNextPage = result.nextPage;
+    }
+
+    throw new Error(
+      'Se procesaron 100 tandas y la importación sigue en cola. Tocá “Continuar importación” para seguir desde la próxima página.',
+    );
+  };
+
   const handleDownload = async () => {
     if (!job?.storage_path) return;
     setDownloading(true);
@@ -92,10 +135,11 @@ export default function AdminImportDetail({ jobId, onBack }: Props) {
     setProcessError(null);
     setProcessResult(null);
     try {
-      const result = await triggerImportProcessing(job.id);
+      const result = await runProcessingBatches(job.id);
       setProcessResult(result);
       await load();
     } catch (cause) {
+      await load();
       setProcessError(cause instanceof Error ? cause.message : getAdminErrorMessage(cause));
     } finally {
       setProcessing(false);
@@ -110,18 +154,19 @@ export default function AdminImportDetail({ jobId, onBack }: Props) {
     try {
       await requeueImportJob(job.id);
       await load();
-      const result = await triggerImportProcessing(job.id);
+      const result = await runProcessingBatches(job.id);
       setProcessResult(result);
       await load();
     } catch (cause) {
+      await load();
       setProcessError(cause instanceof Error ? cause.message : getAdminErrorMessage(cause));
     } finally {
       setProcessing(false);
     }
   };
 
-  const canProcess = job && (job.status === 'queued' || job.status === 'failed') && job.source_type === 'pdf';
-  const canReprocess = job && (job.status === 'needs_review' || job.status === 'failed' || job.status === 'completed') && job.source_type === 'pdf';
+  const canProcess = job && job.status === 'queued' && job.source_type === 'pdf';
+  const canReprocess = job && (job.status === 'needs_review' || job.status === 'failed' || job.status === 'completed' || job.status === 'claimed' || job.status === 'processing') && job.source_type === 'pdf';
 
   const fileName = job?.storage_path ? job.storage_path.split('/').pop() ?? '' : '';
 
@@ -207,7 +252,7 @@ export default function AdminImportDetail({ jobId, onBack }: Props) {
                   className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
                 >
                   {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  {processing ? 'Procesando…' : 'Procesar importación'}
+                  {processing ? 'Procesando…' : job.progress > 0 ? 'Continuar importación' : 'Procesar importación'}
                 </button>
                 <p className="mt-2 text-xs text-neutral-500">
                   Lee el PDF, extrae texto, detecta imágenes y genera candidatos de producto.
@@ -249,10 +294,14 @@ export default function AdminImportDetail({ jobId, onBack }: Props) {
                   className="flex items-center gap-1.5 rounded-lg bg-neutral-800 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-900 disabled:opacity-60"
                 >
                   {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  {processing ? 'Reprocesando…' : 'Reprocesar importación'}
+                  {processing
+                    ? 'Procesando…'
+                    : job.status === 'claimed' || job.status === 'processing'
+                      ? 'Recuperar importación detenida'
+                      : 'Reprocesar importación'}
                 </button>
                 <p className="mt-2 text-xs text-neutral-500">
-                  Vuelve a procesar el PDF original con la versión actual del procesador. Los resultados anteriores se reemplazan.
+                  Reinicia el PDF desde la primera página y reemplaza los candidatos anteriores. Los productos ya publicados no se modifican. Si el trabajo sigue activo, el servidor va a rechazar el reinicio hasta que venza el bloqueo.
                 </p>
                 {processError && (
                   <p className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700 ring-1 ring-red-100">
