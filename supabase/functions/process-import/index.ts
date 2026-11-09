@@ -228,3 +228,4 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: false, job_id: jobId, outcome: "failed", items: 0, assets: 0, needs_ocr: false, warnings: [], error: errorMsg }, 500);
   }
 });
+

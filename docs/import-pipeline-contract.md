@@ -113,10 +113,38 @@ Bucket privado `indiehub-imports` (50 MB, PDF, XLSX, XLS, CSV, ZIP, JPEG, PNG, W
 
 ## Procesador local
 
-- Programa independiente, sin dependencia de React ni del código del sitio.
-- Se autentica como usuario con rol `processor` mediante la clave pública y su sesión. Nunca usa `service_role`.
-- Flujo: reclamar job, descargar original, procesar localmente, enviar progreso periódico (renueva el lease), enviar resultados, cerrar job.
+- El procesador PDF v1 corre como edge function Supabase (`process-import`).
+- Se autentica con el JWT del usuario admin (que también tiene rol `processor`). Nunca usa `service_role` para llamar las RPC; lo usa solo para descargar el archivo del bucket privado.
+- Flujo: reclamar job, descargar original del bucket, procesar PDF con `pdfjs-dist`, enviar progreso periódico (renueva el lease), enviar resultados, cerrar job.
 - Si el procesador cae, el job se libera automáticamente tras 10 minutos sin progreso.
+- Versión del procesador: `pdf-local-v1`.
+
+### Qué hace pdf-local-v1
+
+1. Descarga el PDF del bucket `indiehub-imports`.
+2. Lee cada página con `pdfjs-dist`.
+3. Extrae texto seleccionable de cada página.
+4. Detecta imágenes embebidas (conteo por página, sin extraer bytes todavía).
+5. Registra assets detectados con `processing_status = "detected"`.
+6. Detecta candidatos de producto a partir del texto (códigos de artículo, precios, nombres, talles).
+7. Si el PDF no tiene texto seleccionable en ninguna página, lo marca como `needs_review` con warning "PDF sin texto extraíble; requiere OCR."
+8. Si hay candidatos, el job termina en `needs_review` (para revisión humana).
+9. Si no hay candidatos ni necesidad de OCR, el job termina en `completed`.
+
+### Cómo probarlo
+
+1. Crear una importación PDF desde `/admin/importaciones` (subir un PDF con texto seleccionable).
+2. Abrir el detalle del job.
+3. Si el job está en estado `queued` y es tipo PDF, aparece el botón "Procesar importación".
+4. Al presionarlo, la edge function procesa el PDF y muestra el resultado (items detectados, assets, warnings).
+5. El estado del job se actualiza a `needs_review` o `completed`.
+
+### Arquitectura del processor core
+
+- `supabase/functions/process-import/processor.ts`: core independiente de Supabase. Define tipos `ExtractedPage`, `DetectedAsset`, `ProductCandidate`, `ProcessingResult`. Recibe bytes del PDF y devuelve resultados estructurados.
+- `supabase/functions/process-import/index.ts`: integración con Supabase. Autentica al usuario, reclama el job, descarga el PDF, llama al core, envía resultados vía RPC.
+
+El core puede reutilizarse en un procesador local (Node/Python) sin cambios en el contrato de datos.
 
 ## Compatibilidad local a nube
 
@@ -133,6 +161,6 @@ El mismo contrato sirve si el procesador pasa a correr en un servidor: solo camb
 
 ## Fuera de alcance en esta etapa
 
-- Procesamiento real de archivos (PDF, Excel, imágenes).
+- Extracción de bytes de imágenes embebidas (los assets se registran como `detected`, no `extracted`).
 - Aprobación de items y aplicación a `products`.
-- Creación del usuario `processor` (pendiente de provisión).
+- OCR para PDFs escaneados (detectado pero no implementado).
