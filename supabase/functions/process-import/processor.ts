@@ -1,7 +1,7 @@
 // Processor core: types and PDF processing logic.
 // Independent of Supabase. Operates on raw bytes and returns structured results.
 
-export const PROCESSOR_VERSION = "pdf-local-v2";
+export const PROCESSOR_VERSION = "pdf-local-v3";
 
 export type AssetType =
   | "source"
@@ -39,6 +39,10 @@ export interface DetectedAsset {
   processing_status: "extracted" | "detected" | "failed";
   metadata: Record<string, unknown>;
   item_index: number | null;
+
+  // Bytes are used internally by process-import.
+  // They are intentionally ignored by assetsToRpc().
+  data?: Uint8Array;
 }
 
 export interface ProductCandidate {
@@ -74,6 +78,10 @@ export interface ProcessPdfParams {
   ) => Promise<void>;
 }
 
+// ---------------------------------------------------------
+// Binary helpers
+// ---------------------------------------------------------
+
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = "";
   const chunk = 0x8000;
@@ -90,17 +98,365 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function sha256Hex(data: Uint8Array): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest(
-    "SHA-256",
-    data,
+async function sha256Hex(
+  data: Uint8Array,
+): Promise<string> {
+  const hashBuffer =
+    await crypto.subtle.digest(
+      "SHA-256",
+      data,
+    );
+
+  const hashArray =
+    new Uint8Array(
+      hashBuffer,
+    );
+
+  return Array.from(
+    hashArray,
+  )
+    .map((b) =>
+      b.toString(16).padStart(2, "0"),
+    )
+    .join("");
+}
+
+function writeUint32BE(
+  value: number,
+): Uint8Array {
+  return new Uint8Array([
+    (value >>> 24) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 8) & 0xff,
+    value & 0xff,
+  ]);
+}
+
+function concatBytes(
+  ...arrays: Uint8Array[]
+): Uint8Array {
+  const total = arrays.reduce(
+    (sum, array) =>
+      sum + array.length,
+    0,
   );
 
-  const hashArray = new Uint8Array(hashBuffer);
+  const result =
+    new Uint8Array(total);
 
-  return Array.from(hashArray)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  let offset = 0;
+
+  for (const array of arrays) {
+    result.set(
+      array,
+      offset,
+    );
+
+    offset +=
+      array.length;
+  }
+
+  return result;
+}
+
+function crc32(
+  data: Uint8Array,
+): number {
+  let crc = 0xffffffff;
+
+  for (const byte of data) {
+    crc ^= byte;
+
+    for (let i = 0; i < 8; i++) {
+      crc =
+        (crc >>> 1) ^
+        (0xedb88320 &
+          -(crc & 1));
+    }
+  }
+
+  return (
+    (crc ^ 0xffffffff) >>>
+    0
+  );
+}
+
+function pngChunk(
+  type: string,
+  data: Uint8Array,
+): Uint8Array {
+  const typeBytes =
+    new TextEncoder().encode(
+      type,
+    );
+
+  const crcData =
+    concatBytes(
+      typeBytes,
+      data,
+    );
+
+  return concatBytes(
+    writeUint32BE(
+      data.length,
+    ),
+    typeBytes,
+    data,
+    writeUint32BE(
+      crc32(
+        crcData,
+      ),
+    ),
+  );
+}
+
+/**
+ * PDF.js often exposes decoded image pixels rather than
+ * the original compressed JPEG/PNG bytes.
+ *
+ * We normalize those pixels to PNG so the resulting asset
+ * can always be uploaded as a normal image file.
+ */
+async function rawPixelsToPng(
+  data: Uint8Array,
+  width: number,
+  height: number,
+  kind: number,
+): Promise<Uint8Array> {
+  let channels: number;
+
+  if (kind === 1) {
+    // PDF.js grayscale 1bpp.
+    channels = 1;
+  } else if (kind === 2) {
+    // PDF.js RGB 24bpp.
+    channels = 3;
+  } else if (kind === 3) {
+    // PDF.js RGBA 32bpp.
+    channels = 4;
+  } else {
+    throw new Error(
+      `Tipo de imagen PDF.js no soportado: ${kind}`,
+    );
+  }
+
+  const expected =
+    width *
+    height *
+    channels;
+
+  if (
+    data.length <
+    expected
+  ) {
+    throw new Error(
+      `Datos de imagen incompletos: ${data.length}/${expected} bytes`,
+    );
+  }
+
+  let rgba =
+    new Uint8Array(
+      width *
+        height *
+        4,
+    );
+
+  if (channels === 4) {
+    rgba.set(
+      data.subarray(
+        0,
+        rgba.length,
+      ),
+    );
+  } else if (
+    channels === 3
+  ) {
+    let source = 0;
+    let target = 0;
+
+    for (
+      let i = 0;
+      i <
+        width *
+          height;
+      i++
+    ) {
+      rgba[target++] =
+        data[source++];
+      rgba[target++] =
+        data[source++];
+      rgba[target++] =
+        data[source++];
+      rgba[target++] =
+        255;
+    }
+  } else {
+    // Grayscale.
+    for (
+      let i = 0;
+      i <
+        width *
+          height;
+      i++
+    ) {
+      const value =
+        data[i];
+
+      const target =
+        i * 4;
+
+      rgba[target] =
+        value;
+      rgba[target + 1] =
+        value;
+      rgba[target + 2] =
+        value;
+      rgba[target + 3] =
+        255;
+    }
+  }
+
+  // PNG scanlines need one filter byte per row.
+  const scanlineLength =
+    width * 4 + 1;
+
+  const scanlines =
+    new Uint8Array(
+      scanlineLength *
+        height,
+    );
+
+  for (
+    let y = 0;
+    y < height;
+    y++
+  ) {
+    const rowStart =
+      y *
+      scanlineLength;
+
+    scanlines[rowStart] =
+      0;
+
+    scanlines.set(
+      rgba.subarray(
+        y *
+          width *
+          4,
+        (y + 1) *
+          width *
+          4,
+      ),
+      rowStart + 1,
+    );
+  }
+
+  const compressed =
+    await compressDeflate(
+      scanlines,
+    );
+
+  const signature =
+    new Uint8Array([
+      137,
+      80,
+      78,
+      71,
+      13,
+      10,
+      26,
+      10,
+    ]);
+
+  const ihdr =
+    new Uint8Array(
+      13,
+    );
+
+  ihdr.set(
+    writeUint32BE(
+      width,
+    ),
+    0,
+  );
+
+  ihdr.set(
+    writeUint32BE(
+      height,
+    ),
+    4,
+  );
+
+  ihdr[8] =
+    8; // bit depth
+
+  ihdr[9] =
+    6; // RGBA
+
+  ihdr[10] =
+    0;
+
+  ihdr[11] =
+    0;
+
+  ihdr[12] =
+    0;
+
+  return concatBytes(
+    signature,
+    pngChunk(
+      "IHDR",
+      ihdr,
+    ),
+    pngChunk(
+      "IDAT",
+      compressed,
+    ),
+    pngChunk(
+      "IEND",
+      new Uint8Array(),
+    ),
+  );
+}
+
+async function compressDeflate(
+  data: Uint8Array,
+): Promise<Uint8Array> {
+  const CompressionStreamCtor =
+    globalThis
+      .CompressionStream;
+
+  if (
+    typeof CompressionStreamCtor !==
+    "undefined"
+  ) {
+    const stream =
+      new CompressionStream(
+        "deflate",
+      );
+
+    const writer =
+      stream.writable.getWriter();
+
+    await writer.write(
+      data,
+    );
+
+    await writer.close();
+
+    const response =
+      new Response(
+        stream.readable,
+      );
+
+    return new Uint8Array(
+      await response.arrayBuffer(),
+    );
+  }
+
+  throw new Error(
+    "CompressionStream no disponible en este entorno.",
+  );
 }
 
 // ---------------------------------------------------------
@@ -119,9 +475,12 @@ const SIZE_KEYWORDS =
 const CURRENCY_HINTS =
   /\b(ARS|USD|\$|U\$D|pesos?|d[oó]lares?)\b/i;
 
-const CURRENCY_MAP: Record<string, string> = {
+const CURRENCY_MAP: Record<
+  string,
+  string
+> = {
   usd: "USD",
-  u$d: "USD",
+  "u$d": "USD",
   dolares: "USD",
   dólares: "USD",
   ars: "ARS",
@@ -129,46 +488,87 @@ const CURRENCY_MAP: Record<string, string> = {
   $: "ARS",
 };
 
-function detectCurrency(text: string): string {
-  const match = text.match(CURRENCY_HINTS);
+function detectCurrency(
+  text: string,
+): string {
+  const match =
+    text.match(
+      CURRENCY_HINTS,
+    );
 
-  if (!match) return "";
+  if (!match) {
+    return "";
+  }
 
   return (
-    CURRENCY_MAP[match[1].toLowerCase()] ??
+    CURRENCY_MAP[
+      match[1].toLowerCase()
+    ] ??
     "ARS"
   );
 }
 
-function detectSizes(text: string): string[] {
-  const regex = new RegExp(
-    SIZE_KEYWORDS.source,
-    SIZE_KEYWORDS.flags,
-  );
+function detectSizes(
+  text: string,
+): string[] {
+  const regex =
+    new RegExp(
+      SIZE_KEYWORDS.source,
+      SIZE_KEYWORDS.flags,
+    );
 
-  const match = regex.exec(text);
+  const match =
+    regex.exec(
+      text,
+    );
 
-  if (!match) return [];
+  if (!match) {
+    return [];
+  }
 
   return match[2]
-    .split(/[,;/]\s*/)
-    .map((s) => s.trim())
+    .split(
+      /[,;/]\s*/,
+    )
+    .map(
+      (s) =>
+        s.trim(),
+    )
     .filter(Boolean)
-    .slice(0, 20);
+    .slice(
+      0,
+      20,
+    );
 }
 
-function normalizeText(value: string): string {
+function normalizeText(
+  value: string,
+): string {
   return value
-    .replace(/\s+/g, " ")
+    .replace(
+      /\s+/g,
+      " ",
+    )
     .trim();
 }
 
-function isProbablyProductName(text: string): boolean {
-  const normalized = normalizeText(text);
+function isProbablyProductName(
+  text: string,
+): boolean {
+  const normalized =
+    normalizeText(
+      text,
+    );
 
-  if (normalized.length < 3) return false;
+  if (
+    normalized.length <
+    3
+  ) {
+    return false;
+  }
 
-  const lower = normalized.toLowerCase();
+  const lower =
+    normalized.toLowerCase();
 
   const excluded = [
     "contacto",
@@ -196,7 +596,14 @@ function isProbablyProductName(text: string): boolean {
     "copyright",
   ];
 
-  if (excluded.some((word) => lower.includes(word))) {
+  if (
+    excluded.some(
+      (word) =>
+        lower.includes(
+          word,
+        ),
+    )
+  ) {
     return false;
   }
 
@@ -207,66 +614,141 @@ function isProbablyProductName(text: string): boolean {
 // Layout helpers
 // ---------------------------------------------------------
 
+function sortTextItems(
+  items: ExtractedTextItem[],
+): ExtractedTextItem[] {
+  return [
+    ...items,
+  ].sort(
+    (a, b) => {
+      if (
+        Math.abs(
+          a.y -
+            b.y,
+        ) > 4
+      ) {
+        return (
+          a.y -
+          b.y
+        );
+      }
+
+      return (
+        a.x -
+        b.x
+      );
+    },
+  );
+}
+
 function groupTextItemsIntoLines(
   items: ExtractedTextItem[],
 ): string[] {
-  if (items.length === 0) return [];
+  if (
+    items.length ===
+    0
+  ) {
+    return [];
+  }
 
-  const sorted = [...items].sort((a, b) => {
-    if (Math.abs(a.y - b.y) > 4) {
-      return a.y - b.y;
-    }
+  const sorted =
+    sortTextItems(
+      items,
+    );
 
-    return a.x - b.x;
-  });
+  const lines:
+    ExtractedTextItem[][] =
+    [];
 
-  const lines: ExtractedTextItem[][] = [];
+  for (
+    const item of
+      sorted
+  ) {
+    const previous =
+      lines[
+        lines.length -
+          1
+      ];
 
-  for (const item of sorted) {
-    const previous = lines[lines.length - 1];
-
-    if (!previous) {
-      lines.push([item]);
+    if (
+      !previous
+    ) {
+      lines.push([
+        item,
+      ]);
       continue;
     }
 
-    const reference = previous[previous.length - 1];
+    const reference =
+      previous[
+        previous.length -
+          1
+      ];
 
     const sameLine =
-      Math.abs(item.y - reference.y) <=
-      Math.max(3, item.height * 0.5);
+      Math.abs(
+        item.y -
+          reference.y,
+      ) <=
+      Math.max(
+        3,
+        item.height *
+          0.5,
+      );
 
-    if (sameLine) {
-      previous.push(item);
+    if (
+      sameLine
+    ) {
+      previous.push(
+        item,
+      );
     } else {
-      lines.push([item]);
+      lines.push([
+        item,
+      ]);
     }
   }
 
-  return lines.map((line) =>
-    line
-      .sort((a, b) => a.x - b.x)
-      .map((item) => item.text)
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim(),
+  return lines.map(
+    (line) =>
+      line
+        .sort(
+          (a, b) =>
+            a.x -
+            b.x,
+        )
+        .map(
+          (item) =>
+            item.text,
+        )
+        .join(
+          " ",
+        )
+        .replace(
+          /\s+/g,
+          " ",
+        )
+        .trim(),
   );
 }
 
 function getItemsText(
   items: ExtractedTextItem[],
 ): string {
-  return items
-    .sort((a, b) => {
-      if (Math.abs(a.y - b.y) > 4) {
-        return a.y - b.y;
-      }
-
-      return a.x - b.x;
-    })
-    .map((item) => item.text)
-    .join(" ")
-    .replace(/\s+/g, " ")
+  return sortTextItems(
+    items,
+  )
+    .map(
+      (item) =>
+        item.text,
+    )
+    .join(
+      " ",
+    )
+    .replace(
+      /\s+/g,
+      " ",
+    )
     .trim();
 }
 
@@ -274,15 +756,37 @@ function distanceBetweenItems(
   a: ExtractedTextItem,
   b: ExtractedTextItem,
 ): number {
-  const ax = a.x + a.width / 2;
-  const ay = a.y + a.height / 2;
+  const ax =
+    a.x +
+    a.width /
+      2;
 
-  const bx = b.x + b.width / 2;
-  const by = b.y + b.height / 2;
+  const ay =
+    a.y +
+    a.height /
+      2;
+
+  const bx =
+    b.x +
+    b.width /
+      2;
+
+  const by =
+    b.y +
+    b.height /
+      2;
 
   return Math.sqrt(
-    Math.pow(ax - bx, 2) +
-      Math.pow(ay - by, 2),
+    Math.pow(
+      ax -
+        bx,
+      2,
+    ) +
+      Math.pow(
+        ay -
+          by,
+        2,
+      ),
   );
 }
 
@@ -296,69 +800,90 @@ function detectCandidates(
   candidates: ProductCandidate[];
   warnings: string[];
 } {
-  const candidates: ProductCandidate[] = [];
-  const warnings: string[] = [];
+  const candidates: ProductCandidate[] =
+    [];
+
+  const warnings: string[] =
+    [];
 
   let index = 0;
 
-  for (const page of pages) {
+  for (
+    const page of
+      pages
+  ) {
     if (
       !page.hasText ||
-      page.text.trim().length < 5
+      page.text.trim()
+        .length <
+        5
     ) {
       continue;
     }
 
-    const lines = groupTextItemsIntoLines(
-      page.textItems,
-    );
+    const lines =
+      groupTextItemsIntoLines(
+        page.textItems,
+      );
 
-    const pageText = normalizeText(
-      page.text,
-    );
+    const pageText =
+      normalizeText(
+        page.text,
+      );
 
-    const priceMatches = [
-      ...pageText.matchAll(
-        new RegExp(
-          PRICE_REGEX.source,
-          PRICE_REGEX.flags,
+    const priceMatches =
+      [
+        ...pageText.matchAll(
+          new RegExp(
+            PRICE_REGEX.source,
+            PRICE_REGEX.flags,
+          ),
         ),
-      ),
-    ];
+      ];
 
-    const codeMatches = [
-      ...pageText.matchAll(
-        new RegExp(
-          CODE_REGEX.source,
-          CODE_REGEX.flags,
+    const codeMatches =
+      [
+        ...pageText.matchAll(
+          new RegExp(
+            CODE_REGEX.source,
+            CODE_REGEX.flags,
+          ),
         ),
-      ),
-    ];
+      ];
 
-    const pageSizes = detectSizes(pageText);
+    const pageSizes =
+      detectSizes(
+        pageText,
+      );
 
-    // -----------------------------------------------------
-    // No price
-    // -----------------------------------------------------
-
-    if (priceMatches.length === 0) {
+    if (
+      priceMatches.length ===
+      0
+    ) {
       const hasCode =
-        codeMatches.length > 0;
+        codeMatches.length >
+        0;
 
       const hasSize =
-        pageSizes.length > 0;
+        pageSizes.length >
+        0;
 
-      // Evita convertir páginas editoriales,
-      // institucionales o de portada en productos.
-      if (!hasCode && !hasSize) {
+      if (
+        !hasCode &&
+        !hasSize
+      ) {
         continue;
       }
 
       const candidateName =
-        lines.find(isProbablyProductName) ??
+        lines.find(
+          isProbablyProductName,
+        ) ??
         "";
 
-      if (!candidateName) {
+      if (
+        !candidateName
+      ) {
         continue;
       }
 
@@ -366,32 +891,62 @@ function detectCandidates(
         codeMatches[0];
 
       candidates.push({
-        item_index: index++,
-        source_page: page.pageNumber,
-        raw_text: pageText.slice(0, 5000),
-        external_id: codeMatch
-          ? codeMatch[0]
-              .toUpperCase()
-              .replace(/[_]/g, "-")
-          : "",
-        name: candidateName.slice(0, 200),
-        price: null,
+        item_index:
+          index++,
+        source_page:
+          page.pageNumber,
+        raw_text:
+          pageText.slice(
+            0,
+            5000,
+          ),
+        external_id:
+          codeMatch
+            ? codeMatch[0]
+                .toUpperCase()
+                .replace(
+                  /[_]/g,
+                  "-",
+                )
+            : "",
+        name:
+          candidateName.slice(
+            0,
+            200,
+          ),
+        price:
+          null,
         currency:
-          detectCurrency(pageText) ||
+          detectCurrency(
+            pageText,
+          ) ||
           "ARS",
-        description: lines
-          .filter(
-            (line) =>
-              line !== candidateName,
-          )
-          .slice(0, 5)
-          .join(" ")
-          .slice(0, 500),
-        sizes: pageSizes,
-        image_codes: [],
-        confidence: hasCode
-          ? 0.55
-          : 0.4,
+        description:
+          lines
+            .filter(
+              (line) =>
+                line !==
+                candidateName,
+            )
+            .slice(
+              0,
+              5,
+            )
+            .join(
+              " ",
+            )
+            .slice(
+              0,
+              500,
+            ),
+        sizes:
+          pageSizes,
+        image_codes:
+          [],
+        confidence:
+          hasCode
+            ? 0.55
+            : 0.4,
         warnings: [
           "Sin precio detectado",
           ...(hasCode
@@ -405,88 +960,70 @@ function detectCandidates(
       continue;
     }
 
-    // -----------------------------------------------------
-    // Pages with prices
-    // -----------------------------------------------------
-
     for (
       let priceIndex = 0;
-      priceIndex < priceMatches.length;
+      priceIndex <
+        priceMatches.length;
       priceIndex++
     ) {
       const priceMatch =
-        priceMatches[priceIndex];
+        priceMatches[
+          priceIndex
+        ];
 
       const priceStr =
         priceMatch[1]
-          .replace(/\./g, "")
-          .replace(",", ".");
+          .replace(
+            /\./g,
+            "",
+          )
+          .replace(
+            ",",
+            ".",
+          );
 
       const price =
-        parseFloat(priceStr);
+        parseFloat(
+          priceStr,
+        );
 
       if (
-        Number.isNaN(price) ||
-        price <= 0
+        Number.isNaN(
+          price,
+        ) ||
+        price <=
+          0
       ) {
         continue;
       }
 
-      // Posición aproximada del precio
-      // dentro del texto.
       const priceText =
         priceMatch[0];
 
-      let runningIndex = 0;
-      let priceItem:
-        | ExtractedTextItem
-        | undefined;
+      const occurrence =
+        findNthTextOccurrence(
+          page.textItems,
+          priceText,
+          priceIndex,
+        );
 
-      for (
-        const item of page.textItems
-      ) {
-        const itemStart =
-          runningIndex;
+      const priceItem =
+        occurrence.item;
 
-        const itemEnd =
-          runningIndex +
-          item.text.length;
-
-        if (
-          itemStart <=
-            pageText.indexOf(
-              priceText,
-              runningIndex,
-            ) &&
-          itemEnd >=
-            pageText.indexOf(
-              priceText,
-              runningIndex,
-            )
-        ) {
-          priceItem =
-            item;
-          break;
-        }
-
-        runningIndex =
-          itemEnd + 1;
-      }
-
-      // Si no podemos localizar espacialmente
-      // el precio, mantenemos un fallback
-      // basado en texto.
       let nearbyItems =
         page.textItems;
 
-      if (priceItem) {
+      if (
+        priceItem
+      ) {
         nearbyItems =
           page.textItems.filter(
             (item) =>
               distanceBetweenItems(
-                priceItem!,
+                priceItem,
                 item,
-              ) < 220,
+              ) <
+              220,
           );
       }
 
@@ -516,7 +1053,8 @@ function detectCandidates(
       const candidateName =
         nearbyLines.find(
           (line) =>
-            line !== priceText &&
+            line !==
+              priceText &&
             !line.match(
               PRICE_REGEX,
             ) &&
@@ -526,7 +1064,9 @@ function detectCandidates(
         ) ??
         "";
 
-      if (!candidateName) {
+      if (
+        !candidateName
+      ) {
         warnings.push(
           `Precio detectado en página ${page.pageNumber}, pero no se pudo determinar un nombre de producto.`,
         );
@@ -540,7 +1080,8 @@ function detectCandidates(
             : 0.4;
 
       candidates.push({
-        item_index: index++,
+        item_index:
+          index++,
         source_page:
           page.pageNumber,
         raw_text:
@@ -573,20 +1114,26 @@ function detectCandidates(
             .filter(
               (line) =>
                 line !==
-                candidateName &&
+                  candidateName &&
                 !line.match(
                   PRICE_REGEX,
                 ),
             )
-            .slice(0, 5)
-            .join(" ")
+            .slice(
+              0,
+              5,
+            )
+            .join(
+              " ",
+            )
             .slice(
               0,
               500,
             ),
         sizes:
           nearbySizes,
-        image_codes: [],
+        image_codes:
+          [],
         confidence,
         warnings:
           nearbyCode
@@ -599,7 +1146,8 @@ function detectCandidates(
   }
 
   if (
-    candidates.length === 0
+    candidates.length ===
+    0
   ) {
     warnings.push(
       "No se detectaron candidatos de producto en el texto.",
@@ -610,6 +1158,334 @@ function detectCandidates(
     candidates,
     warnings,
   };
+}
+
+function findNthTextOccurrence(
+  items: ExtractedTextItem[],
+  searchText: string,
+  occurrenceIndex: number,
+): {
+  item:
+    | ExtractedTextItem
+    | undefined;
+} {
+  const sorted =
+    sortTextItems(
+      items,
+    );
+
+  let occurrence = 0;
+
+  for (
+    const item of
+      sorted
+  ) {
+    if (
+      item.text.includes(
+        searchText,
+      )
+    ) {
+      if (
+        occurrence ===
+        occurrenceIndex
+      ) {
+        return {
+          item,
+        };
+      }
+
+      occurrence++;
+    }
+  }
+
+  return {
+    item:
+      undefined,
+  };
+}
+
+// ---------------------------------------------------------
+// PDF image extraction
+// ---------------------------------------------------------
+
+function getImageAssetType(
+  width: number,
+  height: number,
+  pageText: string,
+): AssetType {
+  const area =
+    width *
+    height;
+
+  const lower =
+    pageText.toLowerCase();
+
+  if (
+    lower.includes(
+      "logo",
+    ) &&
+    area <
+      500_000
+  ) {
+    return "logo";
+  }
+
+  if (
+    area >
+    80_000
+  ) {
+    return "product_image";
+  }
+
+  if (
+    area <
+    20_000
+  ) {
+    return "decorative";
+  }
+
+  return "unknown";
+}
+
+async function extractPageImages(
+  page: any,
+  pageNumber: number,
+  brandId: string,
+  jobId: string,
+  pageText: string,
+  pdfjs: any,
+): Promise<DetectedAsset[]> {
+  const assets: DetectedAsset[] =
+    [];
+
+  let operatorList:
+    | any
+    | undefined;
+
+  try {
+    operatorList =
+      await page.getOperatorList();
+  } catch {
+    return assets;
+  }
+
+  const OPS =
+    pdfjs.OPS;
+
+  const imageOps =
+    new Set([
+      OPS.paintImageXObject,
+      OPS.paintInlineImage,
+      OPS.paintImageMaskXObject,
+    ]);
+
+  let imageIndex = 0;
+
+  for (
+    let i = 0;
+    i <
+      operatorList.fnArray.length;
+    i++
+  ) {
+    const op =
+      operatorList.fnArray[i];
+
+    if (
+      !imageOps.has(
+        op,
+      )
+    ) {
+      continue;
+    }
+
+    const args =
+      operatorList
+        .argsArray[i];
+
+    const imageName =
+      args?.[0];
+
+    if (
+      typeof imageName !==
+      "string"
+    ) {
+      continue;
+    }
+
+    try {
+      const image =
+        page.objs.get(
+          imageName,
+        );
+
+      if (
+        !image
+      ) {
+        continue;
+      }
+
+      const width =
+        Number(
+          image.width ??
+            0,
+        );
+
+      const height =
+        Number(
+          image.height ??
+            0,
+        );
+
+      if (
+        width <=
+          0 ||
+        height <=
+          0
+      ) {
+        continue;
+      }
+
+      const rawData =
+        image.data;
+
+      if (
+        !rawData
+      ) {
+        continue;
+      }
+
+      const sourceBytes =
+        rawData instanceof
+        Uint8Array
+          ? rawData
+          : new Uint8Array(
+              rawData,
+            );
+
+      const pngBytes =
+        await rawPixelsToPng(
+          sourceBytes,
+          width,
+          height,
+          Number(
+            image.kind ??
+              3,
+          ),
+        );
+
+      const sha256 =
+        await sha256Hex(
+          pngBytes,
+        );
+
+      const assetId =
+        `page${pageNumber}_img${imageIndex}`;
+
+      assets.push({
+        asset_type:
+          getImageAssetType(
+            width,
+            height,
+            pageText,
+          ),
+        source_page:
+          pageNumber,
+        original_filename:
+          `${assetId}.png`,
+        storage_path:
+          `derived/${brandId}/${jobId}/${assetId}.png`,
+        mime_type:
+          "image/png",
+        file_size:
+          pngBytes.length,
+        width,
+        height,
+        sha256,
+        processing_status:
+          "extracted",
+        metadata: {
+          page:
+            pageNumber,
+          image_index:
+            imageIndex,
+          pdf_object_name:
+            imageName,
+          source_kind:
+            Number(
+              image.kind ??
+                0,
+            ),
+        },
+        item_index:
+          null,
+        data:
+          pngBytes,
+      });
+
+      imageIndex++;
+    } catch {
+      // Una imagen individual que no pueda extraerse
+      // no debe tumbar toda la importación.
+    }
+  }
+
+  return assets;
+}
+
+// ---------------------------------------------------------
+// Image → product association
+// ---------------------------------------------------------
+
+function associateImagesToCandidates(
+  assets: DetectedAsset[],
+  candidates: ProductCandidate[],
+  pages: ExtractedPage[],
+): void {
+  for (
+    const asset of
+      assets
+  ) {
+    const page =
+      pages.find(
+        (p) =>
+          p.pageNumber ===
+          asset.source_page,
+      );
+
+    if (
+      !page ||
+      candidates.length ===
+        0
+    ) {
+      continue;
+    }
+
+    const pageCandidates =
+      candidates.filter(
+        (candidate) =>
+          candidate.source_page ===
+          asset.source_page,
+      );
+
+    if (
+      pageCandidates.length ===
+        1
+    ) {
+      asset.item_index =
+        pageCandidates[0]
+          .item_index;
+
+      continue;
+    }
+
+    // En esta primera versión,
+    // si hay varios productos en una página
+    // no hacemos una asociación agresiva.
+    //
+    // El siguiente paso puede usar las coordenadas
+    // exactas de las imágenes y de los bloques
+    // de producto.
+  }
 }
 
 // ---------------------------------------------------------
@@ -626,9 +1502,14 @@ export async function processPdf(
     onProgress,
   } = params;
 
-  const warnings: string[] = [];
-  const pages: ExtractedPage[] = [];
-  const assets: DetectedAsset[] = [];
+  const warnings: string[] =
+    [];
+
+  const pages: ExtractedPage[] =
+    [];
+
+  const assets: DetectedAsset[] =
+    [];
 
   const pdfjs =
     await import(
@@ -637,7 +1518,8 @@ export async function processPdf(
 
   const loadingTask =
     pdfjs.getDocument({
-      data: pdfBytes,
+      data:
+        pdfBytes,
       isEvalSupported:
         false,
       useSystemFonts:
@@ -651,7 +1533,8 @@ export async function processPdf(
     doc.numPages;
 
   if (
-    totalPages === 0
+    totalPages ===
+    0
   ) {
     await loadingTask.destroy();
 
@@ -659,7 +1542,8 @@ export async function processPdf(
       pages: [],
       assets: [],
       candidates: [],
-      needsOcr: false,
+      needsOcr:
+        false,
       warnings: [
         "El PDF no tiene páginas.",
       ],
@@ -673,18 +1557,21 @@ export async function processPdf(
 
   for (
     let i = 1;
-    i <= totalPages;
+    i <=
+      totalPages;
     i++
   ) {
     const page =
-      await doc.getPage(i);
+      await doc.getPage(
+        i,
+      );
 
     const pageProgress =
       10 +
       Math.floor(
         ((i - 1) /
           totalPages) *
-          70,
+          65,
       );
 
     await onProgress?.(
@@ -692,8 +1579,11 @@ export async function processPdf(
       `Procesando página ${i} de ${totalPages}`,
     );
 
-    let textContent = "";
-    let hasText = false;
+    let textContent =
+      "";
+
+    let hasText =
+      false;
 
     const textItems:
       ExtractedTextItem[] =
@@ -710,7 +1600,8 @@ export async function processPdf(
         if (
           typeof rawItem !==
             "object" ||
-          rawItem === null ||
+          rawItem ===
+            null ||
           !(
             "str" in
             rawItem
@@ -721,10 +1612,14 @@ export async function processPdf(
 
         const item =
           rawItem as {
-            str: string;
-            transform?: number[];
-            width?: number;
-            height?: number;
+            str:
+              string;
+            transform?:
+              number[];
+            width?:
+              number;
+            height?:
+              number;
           };
 
         const value =
@@ -733,7 +1628,9 @@ export async function processPdf(
               "",
           ).trim();
 
-        if (!value) {
+        if (
+          !value
+        ) {
           continue;
         }
 
@@ -744,36 +1641,29 @@ export async function processPdf(
             ? item.transform
             : [];
 
-        const x =
-          Number(
-            transform[4] ??
-              0,
-          );
-
-        const y =
-          Number(
-            transform[5] ??
-              0,
-          );
-
-        const width =
-          Number(
-            item.width ??
-              0,
-          );
-
-        const height =
-          Number(
-            item.height ??
-              0,
-          );
-
         textItems.push({
-          text: value,
-          x,
-          y,
-          width,
-          height,
+          text:
+            value,
+          x:
+            Number(
+              transform[4] ??
+                0,
+            ),
+          y:
+            Number(
+              transform[5] ??
+                0,
+            ),
+          width:
+            Number(
+              item.width ??
+                0,
+            ),
+          height:
+            Number(
+              item.height ??
+                0,
+            ),
         });
       }
 
@@ -834,73 +1724,61 @@ export async function processPdf(
   }
 
   await onProgress?.(
-    82,
-    "Analizando imágenes embebidas",
+    78,
+    "Extrayendo imágenes reales",
   );
 
-  // Por ahora mantenemos detección de imágenes.
-  // La extracción física de bytes de las imágenes
-  // se incorporará en una etapa posterior,
-  // una vez validada la extracción de layout.
+  // PDF.js requiere acceso al objeto de página
+  // para recuperar los recursos gráficos.
+  //
+  // Las páginas anteriores fueron limpiadas, por lo que
+  // volvemos a abrirlas específicamente para extracción.
   for (
-    const page of
-      pages
+    let i = 1;
+    i <=
+      totalPages;
+    i++
   ) {
-    if (
-      page.imageCount ===
-      0
-    ) {
-      continue;
-    }
+    try {
+      const page =
+        await doc.getPage(
+          i,
+        );
 
-    for (
-      let imgIdx = 0;
-      imgIdx <
-        page.imageCount;
-      imgIdx++
-    ) {
-      const assetId =
-        `page${page.pageNumber}_img${imgIdx}`;
+      const pageData =
+        pages.find(
+          (p) =>
+            p.pageNumber ===
+            i,
+        );
 
-      const storagePath =
-        `derived/${brandId}/${jobId}/${assetId}.webp`;
+      if (
+        pageData
+      ) {
+        const extracted =
+          await extractPageImages(
+            page,
+            i,
+            brandId,
+            jobId,
+            pageData.text,
+            pdfjs,
+          );
 
-      assets.push({
-        asset_type:
-          imgIdx === 0 &&
-          page.imageCount ===
-            1
-            ? "product_image"
-            : "unknown",
-        source_page:
-          page.pageNumber,
-        original_filename:
-          assetId,
-        storage_path:
-          storagePath,
-        mime_type:
-          "image/webp",
-        file_size:
-          0,
-        width:
-          null,
-        height:
-          null,
-        sha256:
-          "",
-        processing_status:
-          "detected",
-        metadata: {
-          page:
-            page.pageNumber,
-          image_index:
-            imgIdx,
-        },
-        item_index:
-          null,
-      });
+        assets.push(
+          ...extracted,
+        );
+      }
+
+      page.cleanup();
+    } catch {
+      warnings.push(
+        `No se pudieron extraer las imágenes de la página ${i}.`,
+      );
     }
   }
+
+  await loadingTask.destroy();
 
   await onProgress?.(
     90,
@@ -938,6 +1816,12 @@ export async function processPdf(
 
   warnings.push(
     ...candidateWarnings,
+  );
+
+  associateImagesToCandidates(
+    assets,
+    candidates,
+    pages,
   );
 
   await onProgress?.(
