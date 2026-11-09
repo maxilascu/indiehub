@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { AlertCircle, Loader2, X } from 'lucide-react';
 import type { BrandOption } from '@/lib/adminProductsApi';
-import { getAdminErrorMessage } from '@/lib/adminProductsApi';
+import { createDraftBrand, getAdminErrorMessage } from '@/lib/adminProductsApi';
 import {
   MAX_IMPORT_FILE_BYTES,
   SOURCE_TYPE_OPTIONS,
@@ -19,6 +19,8 @@ interface Props {
   onCreated: (jobId: string) => void;
 }
 
+type BrandMode = 'existing' | 'new';
+
 interface PendingUpload {
   job: CreatedImportJob;
   file: File;
@@ -26,7 +28,9 @@ interface PendingUpload {
 }
 
 interface FormValues {
+  brandMode: BrandMode;
   brandId: string;
+  newBrandName: string;
   sourceType: ImportSourceType;
   sourceName: string;
   sourceUrl: string;
@@ -35,8 +39,14 @@ interface FormValues {
 const INPUT_CLASS =
   'w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-neutral-50 disabled:text-neutral-500';
 
+const MODE_TOGGLE_BASE =
+  'flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition';
+const MODE_TOGGLE_ACTIVE = 'bg-emerald-600 text-white shadow-sm';
+const MODE_TOGGLE_IDLE = 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200';
+
 function validateForm(values: FormValues, file: File | null): string | null {
-  if (!values.brandId) return 'Elegí una marca.';
+  if (values.brandMode === 'existing' && !values.brandId) return 'Elegí una marca.';
+  if (values.brandMode === 'new' && !values.newBrandName.trim()) return 'Ingresá un nombre para la marca.';
   if (!values.sourceName.trim()) return 'Ingresá un nombre para la fuente.';
   const option = SOURCE_TYPE_OPTIONS.find((item) => item.value === values.sourceType);
   if (!option) return 'Elegí un tipo de fuente válido.';
@@ -56,7 +66,9 @@ function validateForm(values: FormValues, file: File | null): string | null {
 
 export default function AdminImportForm({ brands, onClose, onCreated }: Props) {
   const [values, setValues] = useState<FormValues>({
+    brandMode: 'existing',
     brandId: '',
+    newBrandName: '',
     sourceType: 'pdf',
     sourceName: '',
     sourceUrl: '',
@@ -65,6 +77,7 @@ export default function AdminImportForm({ brands, onClose, onCreated }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingUpload | null>(null);
+  const [createdBrandId, setCreatedBrandId] = useState<string | null>(null);
 
   const selectedOption = SOURCE_TYPE_OPTIONS.find((option) => option.value === values.sourceType);
   const needsFile = (selectedOption?.extensions.length ?? 0) > 0;
@@ -84,6 +97,15 @@ export default function AdminImportForm({ brands, onClose, onCreated }: Props) {
       upload.uploaded = true;
     }
     await confirmImportUpload(upload.job.jobId);
+  };
+
+  const resolveBrandId = async (): Promise<string> => {
+    if (pending) return pending.job ? createdBrandId ?? values.brandId : values.brandId;
+    if (values.brandMode === 'existing') return values.brandId;
+    if (createdBrandId) return createdBrandId;
+    const brand = await createDraftBrand(values.newBrandName.trim());
+    setCreatedBrandId(brand.id);
+    return brand.id;
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -113,10 +135,20 @@ export default function AdminImportForm({ brands, onClose, onCreated }: Props) {
     const sourceFile = needsFile ? file : null;
     setSubmitting(true);
     setError(null);
+
+    let brandId: string;
+    try {
+      brandId = await resolveBrandId();
+    } catch (cause) {
+      setError(getAdminErrorMessage(cause));
+      setSubmitting(false);
+      return;
+    }
+
     let job: CreatedImportJob;
     try {
       job = await createImportJob({
-        brandId: values.brandId,
+        brandId,
         sourceType: values.sourceType,
         sourceName: values.sourceName.trim(),
         sourceUrl: values.sourceType === 'website' ? values.sourceUrl.trim() : '',
@@ -167,21 +199,61 @@ export default function AdminImportForm({ brands, onClose, onCreated }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
-          <div>
-            <label htmlFor="import-brand" className="mb-1.5 block text-xs font-semibold text-neutral-700">Marca</label>
-            <select
-              id="import-brand"
-              value={values.brandId}
-              onChange={(event) => update('brandId', event.target.value)}
-              disabled={locked}
-              className={INPUT_CLASS}
-            >
-              <option value="">Elegí una marca</option>
-              {brands.map((brand) => (
-                <option key={brand.id} value={brand.id}>{brand.name}</option>
-              ))}
-            </select>
-          </div>
+          {createdBrandId ? (
+            <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+              La marca fue creada correctamente. Ahora podés continuar con la importación.
+            </div>
+          ) : (
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-neutral-700">Marca</label>
+              <div className="mb-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => update('brandMode', 'existing')}
+                  disabled={locked}
+                  className={`${MODE_TOGGLE_BASE} ${values.brandMode === 'existing' ? MODE_TOGGLE_ACTIVE : MODE_TOGGLE_IDLE}`}
+                >
+                  Marca existente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => update('brandMode', 'new')}
+                  disabled={locked}
+                  className={`${MODE_TOGGLE_BASE} ${values.brandMode === 'new' ? MODE_TOGGLE_ACTIVE : MODE_TOGGLE_IDLE}`}
+                >
+                  Nueva marca
+                </button>
+              </div>
+
+              {values.brandMode === 'existing' ? (
+                <select
+                  id="import-brand"
+                  value={values.brandId}
+                  onChange={(event) => update('brandId', event.target.value)}
+                  disabled={locked || brands.length === 0}
+                  className={INPUT_CLASS}
+                >
+                  <option value="">
+                    {brands.length === 0 ? 'No hay marcas cargadas' : 'Elegí una marca'}
+                  </option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>{brand.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="import-new-brand"
+                  type="text"
+                  maxLength={120}
+                  value={values.newBrandName}
+                  onChange={(event) => update('newBrandName', event.target.value)}
+                  disabled={locked}
+                  placeholder="Nombre de la nueva marca"
+                  className={INPUT_CLASS}
+                />
+              )}
+            </div>
+          )}
 
           <div>
             <label htmlFor="import-source-type" className="mb-1.5 block text-xs font-semibold text-neutral-700">Tipo de fuente</label>

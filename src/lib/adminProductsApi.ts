@@ -103,6 +103,19 @@ export async function fetchBrandOptions(): Promise<BrandOption[]> {
   return (data ?? []) as BrandOption[];
 }
 
+function isDraftBrandPayload(value: unknown): value is { id: string; name: string; status: string } {
+  if (typeof value !== 'object' || value === null) return false;
+  const payload = value as Record<string, unknown>;
+  return typeof payload.id === 'string' && typeof payload.name === 'string' && typeof payload.status === 'string';
+}
+
+export async function createDraftBrand(name: string): Promise<BrandOption> {
+  const { data, error } = await supabase.rpc('admin_create_draft_brand', { p_name: name });
+  if (error) throw error;
+  if (!isDraftBrandPayload(data)) throw new Error('Respuesta inesperada al crear la marca');
+  return { id: data.id, name: data.name, status: data.status };
+}
+
 export async function fetchProductList(
   filters: ProductListFilters
 ): Promise<{ rows: AdminProductListItem[]; total: number }> {
