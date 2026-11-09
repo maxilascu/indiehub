@@ -113,27 +113,46 @@ function detectCandidates(
 
     // Try to find product blocks by looking for price markers.
     const priceMatches = [...page.text.matchAll(PRICE_REGEX)];
-    if (priceMatches.length === 0) {
-      // If a page has text but no prices, still generate a candidate with the page text.
-      if (page.text.trim().length > 20) {
-        const codeMatch = page.text.match(CODE_REGEX);
-        candidates.push({
-          item_index: index++,
-          source_page: page.pageNumber,
-          raw_text: page.text.trim().slice(0, 5000),
-          external_id: codeMatch ? codeMatch[0].toUpperCase().replace(/[_]/g, "-") : "",
-          name: lines[0].slice(0, 200),
-          price: null,
-          currency: detectCurrency(page.text),
-          description: lines.slice(1, 6).join(" ").slice(0, 500),
-          sizes: detectSizes(page.text),
-          image_codes: [],
-          confidence: 0.3,
-          warnings: ["Sin precio detectado"],
-        });
-      }
-      continue;
-    }
+   if (priceMatches.length === 0) {
+  const codeMatches = [...page.text.matchAll(CODE_REGEX)];
+  const hasCode = codeMatches.length > 0;
+  const sizes = detectSizes(page.text);
+  const hasSize = sizes.length > 0;
+
+  // Una página informativa no debe convertirse automáticamente
+  // en un producto.
+  //
+  // Exigimos al menos una señal fuerte de producto:
+  // código de artículo o talle.
+  if (!hasCode && !hasSize) {
+    continue;
+  }
+
+  const codeMatch = codeMatches[0];
+
+  candidates.push({
+    item_index: index++,
+    source_page: page.pageNumber,
+    raw_text: page.text.trim().slice(0, 5000),
+    external_id: codeMatch
+      ? codeMatch[0].toUpperCase().replace(/[_]/g, "-")
+      : "",
+    name: lines[0].slice(0, 200),
+    price: null,
+    currency: detectCurrency(page.text) || "ARS",
+    description: lines.slice(1, 6).join(" ").slice(0, 500),
+    sizes,
+    image_codes: [],
+    confidence: hasCode ? 0.55 : 0.4,
+    warnings: [
+      "Sin precio detectado",
+      ...(hasCode ? [] : ["Código de artículo no detectado"]),
+    ],
+  });
+
+  continue;
+}
+    
 
     // Group lines around each price match into product candidates.
     for (const priceMatch of priceMatches) {
