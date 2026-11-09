@@ -183,3 +183,60 @@ export async function confirmImportUpload(jobId: string): Promise<void> {
   const { error } = await supabase.rpc('admin_confirm_import_upload', { p_job_id: jobId });
   if (error) throw error;
 }
+
+export interface ProcessImportResult {
+  ok: boolean;
+  jobId: string;
+  outcome: 'completed' | 'needs_review' | 'failed';
+  items: number;
+  assets: number;
+  needsOcr: boolean;
+  warnings: string[];
+  error?: string;
+}
+
+function isProcessResult(value: unknown): value is ProcessImportResult {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.ok === 'boolean' && typeof v.job_id === 'string' && typeof v.outcome === 'string';
+}
+
+export async function triggerImportProcessing(jobId: string): Promise<ProcessImportResult> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('No hay sesión activa');
+
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-import`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ job_id: jobId }),
+  });
+
+  if (!response.ok) {
+    let message = `Error ${response.status}`;
+    try {
+      const body = await response.json();
+      if (typeof body?.error === 'string') message = body.error;
+    } catch {
+      // ignore parse error
+    }
+    throw new Error(message);
+  }
+
+  const body = await response.json();
+  if (!isProcessResult(body)) throw new Error('Respuesta inesperada del procesador');
+  return {
+    ok: body.ok,
+    jobId: body.jobId,
+    outcome: body.outcome as ProcessImportResult['outcome'],
+    items: body.items,
+    assets: body.assets,
+    needsOcr: body.needsOcr,
+    warnings: body.warnings,
+    error: body.error,
+  };
+}

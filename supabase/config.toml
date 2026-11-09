@@ -9,3 +9,7 @@ entrypoint = "./functions/brands-csv/index.ts"
 [functions.upload-product-images]
 verify_jwt = true
 entrypoint = "./functions/upload-product-images/index.ts"
+
+[functions.process-import]
+verify_jwt = true
+entrypoint = "./functions/process-import/index.ts"
